@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+*.log
+
+# Model download caches, if ever pointed locally
+.cache/

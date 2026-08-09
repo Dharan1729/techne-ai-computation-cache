@@ -1,0 +1,66 @@
+"""Task/computation identification: map a natural-language request to a
+canonical computation signature (a task_type in ``computation.TASK_REGISTRY``).
+
+This is deliberately the simplest thing that could work, per the brief's
+§14 instruction not to reach for LLM-based extraction until the
+deterministic version is validated: embed the request, compare against
+embeddings of each canonical task's example phrasings, and take the
+task whose closest example exceeds a similarity threshold. No LLM call
+is made for identification — this step is (and must be, to keep the
+computation-cache hit path free of the very LLM call it's trying to
+avoid) itself a lightweight embedding lookup, not a generative one.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from ..computation.tasks import TASK_REGISTRY, TaskSpec
+from .embedder import Embedder
+
+
+@dataclass
+class IdentificationResult:
+    task_type: str | None
+    task_spec: TaskSpec | None
+    similarity: float
+    matched_example: str | None
+
+
+class TaskIdentifier:
+    def __init__(self, embedder: Embedder | None = None, threshold: float = 0.60) -> None:
+        self.embedder = embedder or Embedder()
+        self.threshold = threshold
+        self._example_texts: list[str] = []
+        self._example_task_types: list[str] = []
+        self._example_vecs: np.ndarray | None = None
+
+    def _build_index(self) -> None:
+        if self._example_vecs is not None:
+            return
+        for task_type, spec in TASK_REGISTRY.items():
+            for phrasing in spec.example_phrasings:
+                self._example_texts.append(phrasing)
+                self._example_task_types.append(task_type)
+        self._example_vecs = self.embedder.encode(self._example_texts)
+
+    def identify(self, request_text: str) -> IdentificationResult:
+        self._build_index()
+        assert self._example_vecs is not None
+        query = self.embedder.encode_one(request_text)
+        sims = self._example_vecs @ query
+        best_idx = int(np.argmax(sims))
+        best_sim = float(sims[best_idx])
+
+        if best_sim < self.threshold:
+            return IdentificationResult(None, None, best_sim, None)
+
+        task_type = self._example_task_types[best_idx]
+        return IdentificationResult(
+            task_type=task_type,
+            task_spec=TASK_REGISTRY[task_type],
+            similarity=best_sim,
+            matched_example=self._example_texts[best_idx],
+        )
