@@ -25,4 +25,8 @@ def make_backend(name: str = "simulated", **kwargs):
         from .gemini import GeminiLLM
 
         return GeminiLLM(**kwargs)
+    if name == "ollama":
+        from .ollama import OllamaLLM
+
+        return OllamaLLM(**kwargs)
     raise ValueError(f"Unknown LLM backend: {name!r}")

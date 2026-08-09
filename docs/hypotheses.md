@@ -134,3 +134,38 @@ itself, a finding this project's own earlier research (the sibling
 `semantic caching/docker-tests` spike) had already flagged qualitatively
 and this run now confirms quantitatively, on a different workload, with
 a controlled sweep.
+
+## Addendum: what the real-backend (Ollama) run adds to H3/H4
+
+EXP-008 (`docs/experiment-log.md`) replaced the simulated LLM with a
+real local model (`llama3:8b` via Ollama) across all four core
+baselines, at full workload scale, with no rate limit to cut the run
+short. It reproduced H3/H4's structural finding exactly — the
+computation cache's hit path is still 0% invalid, 100% correct — and
+then surfaced something none of the simulated-backend runs *could*
+have shown:
+
+> **The real model, asked to compute these arithmetic/formula questions
+> directly, was only correct 48.7% of the time overall — and 0% of the
+> time on `compound_interest` and `margin` specifically (18/18 and
+> 12/12 wrong).** Because 77.3% of the computation cache's traffic never
+> reaches the model at all, its overall correctness came out to 86.7% —
+> using the *identical* underlying LLM as the 48.7%-correct `no_cache`
+> baseline.
+
+This reframes H4 ("computation caching can reduce LLM calls without
+requiring stale response reuse") with a dimension the original
+hypothesis didn't anticipate: reducing LLM calls for deterministic
+sub-tasks isn't only a cost/latency optimization, it's also a
+correctness hedge against the model's own unreliability at exactly the
+kind of task this repo studies. A semantic cache — even a well-built one
+using a strong embedding model, even RedisVL itself — still asks the
+model to compute the answer on every miss, and inherits whatever
+fraction of the time the model gets that computation wrong. A
+computation cache's guarantee (correct by construction on a hit) is
+unaffected by model quality in a way no response-caching approach,
+however good its embedding model, can match. Stated carefully, per
+EXP-008's own limitations section: this is one real model, one size, no
+prompt engineering, a single un-repeated run — not a claim that LLMs
+"can't do arithmetic," only a measured, honest instance of a
+well-documented general phenomenon, on this project's own workload.

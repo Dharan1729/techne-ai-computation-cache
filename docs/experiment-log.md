@@ -494,3 +494,183 @@ misses/fallbacks) but not for anything close to EXP-006's 150-request,
 multi-threshold scale — a full real-backend replication of EXP-006
 would need either a paid tier or accumulating results across several
 days' free quota.
+
+---
+
+## EXP-008 — Full-scale real-backend validation (Ollama, local, no quota) — a bigger finding than expected
+
+**Date**: 2026-08-10
+**Motivation**: EXP-007 established the harness works correctly against a
+real model but couldn't run at scale — blocked on Gemini's free-tier
+daily cap. Ollama, run fully locally (this environment: a MacBook with
+an Apple M4 Pro, 16-core CPU / 20-core GPU), has no such ceiling. Added
+`aicache/llm/ollama.py` (same `LLMClient` interface as the Gemini
+backend; local REST to `http://localhost:11434/api/generate`, no auth,
+real token counts reported by Ollama itself rather than a heuristic).
+Model used: `llama3` (8B, already present locally — no new pull
+needed), default Ollama sampling settings (not pinned to
+temperature 0 — see Limitations below).
+
+**A pricing bug caught before this run could mislabel its results**:
+while wiring up the Ollama backend, a source read of
+`aicache/llm/pricing.py::estimate_cost_usd` found it fell back to
+Claude Haiku's rate card for *any* unrecognized model name — meaning a
+real Gemini or Ollama result would have been silently priced as if it
+were a Claude Haiku call. Fixed to return `$0.00` for models with no
+pricing-table entry instead (an honest "not priced," not a wrong
+number) before this run — so every `cost_usd` value in this experiment's
+results is `0.0`, correctly reflecting that neither model has an entry
+in a Claude-only pricing table, not that inference was free. For Ollama
+specifically, `$0.00` means real local compute time was spent, not
+literal zero cost.
+
+**Configuration**: full default workload (150 requests, 9 task types,
+seed 42) through all four core baselines —
+`python -m benchmarks.run_experiment --backend ollama --skip-threshold-sweep
+--skip-external --output-dir results/real_backend_ollama` (the
+`--output-dir` flag was added *because* the first attempt at this run
+didn't have it yet and silently overwrote EXP-006's committed
+`results/results.csv` / `summary.json` — recovered from git history
+before anything was lost; the flag exists so that mistake can't repeat).
+Threshold sweep and GPTCache/RedisVL comparison were skipped
+deliberately — both are about caching-algorithm/embedding behavior,
+already validated exhaustively in EXP-006, and don't depend on which
+LLM answers a miss.
+
+**Observed** (full breakdown in `results/real_backend_ollama/`):
+
+| Baseline | Hit rate | Correctness |
+|---|---|---|
+| A — No cache | 0.0% | 48.7% |
+| B — Exact cache | 0.0% | 46.7% |
+| C — Semantic cache (0.75) | 64.0% | 54.0% |
+| D — Computation cache | 77.3% | **86.7%** |
+
+![Correctness by baseline, real backend](../results/real_backend_ollama/correctness_real_backend.png)
+
+**The headline number isn't the cache comparison — it's `no_cache`'s
+48.7%.** Calling a real local 8B model directly, once per request, with
+no tool use and no chain-of-thought scaffolding, got these
+closed-form arithmetic/formula questions right less than half the time.
+Broken down by task type (from the `no_cache` condition specifically —
+this isolates the model's own raw accuracy from any caching behavior):
+
+| Task | Accuracy |
+|---|---|
+| `add` | 100% |
+| `subtract` | 94% |
+| `revenue` | 56% |
+| `percentage` | 44% |
+| `multiply` | 44% |
+| `tax` | 42% |
+| `discounted_price` | 39% |
+| `compound_interest` | **0%** |
+| `margin` | **0%** |
+
+![Real LLM accuracy by task type](../results/real_backend_ollama/llm_accuracy_by_task_type.png)
+
+Single-digit-friendly addition and subtraction are essentially solved;
+anything requiring more than one arithmetic step (a percentage of a
+number, a discount then a subtraction, an exponent for compound
+interest) degrades fast, and multi-step compound interest and margin
+calculations were wrong on **every single one of 18 and 12 attempts
+respectively.** This is a well-known, general limitation of LLMs doing
+raw arithmetic without a tool (not a novel finding about language
+models in general) — the value of measuring it *here* is that it's
+this project's own workload, this project's own harness, a real
+number instead of received wisdom.
+
+**Why this matters for the cache comparison — a mechanism this
+project hadn't identified before this run:**
+
+Breaking down `semantic_cache` by outcome:
+
+| Outcome | n | Correct |
+|---|---|---|
+| `hit_valid` | 52 | 100% (by definition) |
+| `hit_invalid` | 44 | 0% (by definition) |
+| `miss` (fresh LLM call) | 54 | **53.7%** |
+
+Even when the cache correctly decided "this is not a safe reuse, ask the
+model" (a `miss`), the resulting answer was only right 53.7% of the
+time — because that's just the underlying model's own accuracy on this
+workload, independent of anything cache-related. **A real semantic
+cache's overall correctness is therefore a mix of two unrelated failure
+sources**: false-hit reuse (the mechanism EXP-004–006 measured, still
+present here — 44 invalid hits out of 96 total hits, 45.8%, in the same
+range as the simulated-backend sweep at this threshold) *and* the base
+model simply being wrong on a fresh call. The simulated backend
+(EXP-001–006) couldn't show this second source at all, because its
+"model" was correct by construction on every miss.
+
+The same decomposition explains `computation_cache`'s 86.7%:
+
+| Outcome | n | Correct |
+|---|---|---|
+| `hit_valid` | 116 | 100% |
+| `hit_invalid` | 0 | — |
+| `fallback` (LLM call) | 34 | 41.2% |
+
+**The hit path is still exactly what EXP-004–006 found: 0% invalid, 100%
+correct, unchanged by which model answers a fallback** — this is the
+one number in this whole run that's a pure replication, and it
+replicated exactly. What's new is what happens on `no_cache`'s 48.7%
+baseline once you route 77.3% of that same traffic around the
+unreliable model entirely: `0.773×100% + 0.227×41.2% ≈ 86.7%`, matching
+the observed figure. **Computation caching's real-world benefit, on
+this run, isn't just "avoids the semantic cache's stale-reuse errors" —
+it's "avoids asking an unreliable model to do arithmetic at all, for
+most of its traffic," which is a categorically different and arguably
+larger benefit than anything the simulated-backend experiments could
+surface**, because they gave every condition a perfectly-accurate LLM
+by construction.
+
+**An observed anomaly, reported rather than explained away**:
+`exact_cache` took 574.85s wall-clock for 150 calls (~3.83s/call) versus
+`no_cache`'s 287.97s (~1.92s/call) for the identical workload run
+immediately before it — nearly 2× slower for a condition that should
+behave almost identically to `no_cache` (near-zero hit rate expected and
+observed). No root cause was investigated (thermal throttling under
+sustained local GPU load and background system activity are plausible;
+neither was measured). Flagged as a real limitation of a single,
+uncontrolled local run — see Limitations below — not smoothed over.
+
+**Limitations specific to this run**:
+
+- **Single run, no repeated trials** — same caveat as every other
+  experiment in this log, but sharper here: Ollama's default sampling
+  isn't pinned to temperature 0, so the *same prompt* can yield a
+  *different* answer on a different call (unlike the simulated backend,
+  which is fully deterministic). The 48.7%/86.7%/etc. figures are one
+  draw from a real distribution, not a fixed ground truth.
+- **One model, one size** — `llama3` (8B). A larger model, a model
+  fine-tuned or prompted for arithmetic, or a model given a code-execution
+  tool would very plausibly score far higher on `no_cache` — this run
+  says something true about *this* model configuration, not about LLMs'
+  arithmetic ability in general.
+- **No prompt engineering attempted** — the workload's phrasings are
+  the same natural-language questions used throughout this project;
+  no "think step by step" or "use a calculator" instruction was added.
+  A production system would very likely add exactly this kind of
+  scaffolding, which would change `no_cache`'s baseline and therefore
+  the gap this experiment measured.
+- **The unexplained 2× latency anomaly** noted above.
+
+**Interpretation, stated carefully**: this result does not mean
+"semantic caching is bad" or "computation caching solves LLM math" in
+general — a better-prompted or larger real model would likely close
+much of the `no_cache` gap on its own. What it does show, on this
+project's own workload with this specific real local model: routing
+deterministic sub-tasks around the LLM entirely is not merely a
+cache-correctness optimization, it's also a hedge against the model's
+own unreliability at exactly the kind of task this repo studies — and
+that hedge is unavailable to any approach (semantic caching included)
+that still asks the model to compute an answer on every miss.
+
+**Next**: a repeated-trials version of this run (several seeds, or
+several draws per request) would turn "48.7%" into a distribution
+rather than a point estimate — listed as follow-up, not attempted here.
+Also worth trying: the same run with a prompt that asks the model to
+show its work step-by-step (a cheap, realistic mitigation) to see how
+much of the `no_cache` gap is closable without a computation cache at
+all.

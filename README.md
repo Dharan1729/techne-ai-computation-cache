@@ -74,8 +74,11 @@ and are explicitly out of scope for this prototype — see
 - LLM backend: a **simulated** backend by default (deterministic,
   offline, zero cost — see `aicache/llm/simulated.py` for exactly what's
   real (token-count heuristic, published pricing) vs. synthetic (latency
-  distribution) about it) and a pluggable, real **Gemini** backend
-  (`aicache/llm/gemini.py`, inactive unless `GEMINI_API_KEY` is set).
+  distribution) about it), a pluggable real **Gemini** backend
+  (`aicache/llm/gemini.py`, inactive unless `GEMINI_API_KEY` is set;
+  free-tier-capped at 20 requests/day), and a pluggable real **Ollama**
+  backend (`aicache/llm/ollama.py`, fully local, no quota — used for the
+  full-scale real-model validation in EXP-008).
 - Embedding model: `redis/langcache-embed-v1` — chosen after directly
   comparing it against a generic sentence-similarity model and finding
   it separates genuine paraphrases from different-parameter requests far
@@ -98,6 +101,11 @@ pip install -e .
 python -m pytest tests/ -q                    # 51 tests (48 always run + 3 external, auto-skipped if unavailable)
 python -m benchmarks.run_experiment           # writes results/results.csv, results/summary.json
 python -m benchmarks.plots                    # writes results/*.png
+
+# Real-model validation (needs `ollama serve` running + a model pulled, e.g. `ollama pull llama3`):
+python -m benchmarks.run_experiment --backend ollama --skip-threshold-sweep --skip-external \
+    --output-dir results/real_backend_ollama
+python -m benchmarks.plot_real_backend
 ```
 
 ## Results
@@ -144,6 +152,44 @@ refusal to guess, not a failure. Full numbers and interpretation:
 `semantic_threshold_sweep.png`, `cross_system_correctness.png`) are in
 `results/`.
 
+### A third finding: what a real model adds (EXP-008, real local LLM, no simulation)
+
+Every result above uses a simulated LLM that is correct by construction
+— useful for isolating caching-algorithm behavior, but blind to one
+thing: whether the underlying model can actually do the computation.
+Re-running all four core baselines at full scale (150 requests) against
+a real local model (`llama3:8b` via Ollama, chosen specifically because
+it runs unlimited and free on this project's own hardware, after a
+Gemini API free-tier key turned out to cap at 20 requests/day) answered
+that question directly:
+
+| Baseline (real LLM, same model throughout) | Hit rate | Correctness |
+|---|---|---|
+| A — No cache | 0.0% | **48.7%** |
+| B — Exact cache | 0.0% | 46.7% |
+| C — This repo's semantic cache | 64.0% | 54.0% |
+| D — Computation cache | 77.3% | **86.7%** |
+
+![Correctness by baseline, real backend](results/real_backend_ollama/correctness_real_backend.png)
+
+Calling the model directly for every request got these questions right
+less than half the time — and 0% of the time on `compound_interest` and
+`margin` specifically (wrong on all 18 and all 12 attempts):
+
+![Real LLM accuracy by task type](results/real_backend_ollama/llm_accuracy_by_task_type.png)
+
+Because the computation cache routes 77.3% of its traffic around the
+model entirely, its correctness came out to 86.7% — using the *exact
+same* underlying LLM as the 48.7%-correct `no_cache` baseline. This is a
+different, and arguably larger, argument for computation caching than
+the stale-reuse story above: it's not just safer than semantic caching,
+it's a hedge against the model's own unreliability at deterministic
+sub-tasks — something no response-caching approach can offer, since it
+still asks the model to compute the answer on every miss. Full
+breakdown, methodology, and the (real, reported-not-hidden) limitations
+of a single un-repeated local run: `docs/experiment-log.md` EXP-008,
+and the addendum in `docs/hypotheses.md`.
+
 ## Limitations
 
 - **Single run, single seed** — no repeated-runs variance or confidence
@@ -166,14 +212,18 @@ refusal to guess, not a failure. Full numbers and interpretation:
   reachable Redis instance; both are skipped gracefully (not faked) when
   absent. See `docs/evaluation.md`.
 - **Simulated LLM backend by default** — see `aicache/llm/simulated.py`
-  for exactly what's real vs. synthetic about its numbers. A real
-  Gemini backend is wired and working (`aicache/llm/gemini.py`) and a
-  spot-check against it already paid for itself: it caught a real bug
-  in this repo's own correctness checker (it parsed the *first* number
-  in a response, which broke against a real model showing its work —
-  fixed, see `docs/experiment-log.md` EXP-007). A full-scale real-backend
-  replication of EXP-006 hasn't run yet — blocked on a hard 20
-  requests/day free-tier quota, not on anything left to build.
+  for exactly what's real vs. synthetic about its numbers. Two real
+  backends are wired and working: Gemini (`aicache/llm/gemini.py`,
+  hit a hard 20 requests/day free-tier quota — see EXP-007) and Ollama
+  (`aicache/llm/ollama.py`, ran the full 150-request core comparison
+  with no quota limit — EXP-008). The real-backend runs found two real
+  bugs in this repo's own harness before they could distort results (a
+  correctness-parser bug, EXP-007; a cost-fallback bug that would have
+  mislabeled real-model costs as Claude Haiku pricing, EXP-008) — both
+  fixed and covered by tests. EXP-008's threshold sweep and external
+  (GPTCache/RedisVL) comparison weren't re-run against a real backend
+  (deliberately out of scope — see that entry); those remain validated
+  only against the simulated backend.
 - **No eviction/admission policy of any kind** — see
   `docs/eviction-future-work.md`; explicitly deferred, not solved.
 
@@ -203,8 +253,11 @@ ai-computation-cache/
 │                        binding/, validation/, metrics/, llm/
 ├── workloads/           Level 1/2 workload generator + paraphrase templates
 ├── benchmarks/          baselines.py, run_experiment.py, plots.py,
-│                        external/ (real GPTCache + RedisVL adapters)
+│                        plot_real_backend.py, external/ (real GPTCache +
+│                        RedisVL adapters)
 ├── tests/                51 unit + integration tests
 ├── results/             results.csv, summary.json, generated charts
+│                        (simulated-backend, EXP-006 headline numbers)
+│   └── real_backend_ollama/  real-model validation, EXP-008
 └── configs/             (reserved for future experiment configs)
 ```

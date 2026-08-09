@@ -1,11 +1,14 @@
 """Run the immediate experiment (brief §5): baselines A-D over the Level 1/2
 workload, plus a semantic-cache threshold sweep (brief §13), and write
-results to results/results.csv + results/results.json.
+results to results/results.csv + results/summary.json (or --output-dir).
 
 Usage:
     python -m benchmarks.run_experiment
     python -m benchmarks.run_experiment --backend simulated --seed 42
     python -m benchmarks.run_experiment --backend gemini   # needs GEMINI_API_KEY
+    python -m benchmarks.run_experiment --backend ollama   # needs `ollama serve` running locally
+    python -m benchmarks.run_experiment --backend ollama --output-dir results/real_backend_ollama \\
+        --skip-threshold-sweep --skip-external   # don't clobber the headline simulated-backend results
 """
 
 from __future__ import annotations
@@ -47,7 +50,7 @@ SEMANTIC_THRESHOLDS = [0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--backend", default="simulated", choices=["simulated", "gemini"])
+    ap.add_argument("--backend", default="simulated", choices=["simulated", "gemini", "ollama"])
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--param-sets-per-task", type=int, default=6)
     ap.add_argument("--paraphrases-per-param-set", type=int, default=3)
@@ -63,7 +66,21 @@ def main() -> None:
         action="store_true",
         help="Skip the GPTCache/RedisVL comparison baselines even if available",
     )
+    ap.add_argument(
+        "--output-dir",
+        default=None,
+        help=(
+            "Where to write results.csv/summary.json. Defaults to results/ — "
+            "pass a different directory (e.g. results/real_backend_ollama) for "
+            "any run that shouldn't overwrite the headline simulated-backend "
+            "results (see docs/experiment-log.md EXP-008 for why this flag "
+            "exists: an earlier real-backend run clobbered EXP-006's results "
+            "before this existed, and had to be recovered from git history)."
+        ),
+    )
     args = ap.parse_args()
+
+    output_dir = Path(args.output_dir) if args.output_dir else RESULTS_DIR
 
     print(f"[config] backend={args.backend} seed={args.seed}")
     workload = generate_workload(
@@ -148,10 +165,10 @@ def main() -> None:
                 run(gc_label, gc_fn, optional=True)
                 run(rv_label, rv_fn, optional=True)
 
-    RESULTS_DIR.mkdir(exist_ok=True)
-    _write_csv(all_results, RESULTS_DIR / "results.csv")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _write_csv(all_results, output_dir / "results.csv")
     summaries = summarize_all(all_results)
-    _write_summary_json(summaries, RESULTS_DIR / "summary.json")
+    _write_summary_json(summaries, output_dir / "summary.json")
 
     print("\n=== Summary ===")
     header = f"{'baseline':<24}{'n':>6}{'hit%':>8}{'valid%':>8}{'invalid%':>9}{'fallback%':>10}{'correct%':>9}{'tokens':>10}{'cost$':>10}{'p50ms':>8}"
@@ -162,7 +179,7 @@ def main() -> None:
             f"{s.invalid_hit_rate*100:>8.1f}%{s.fallback_rate*100:>9.1f}%{s.correctness_rate*100:>8.1f}%"
             f"{s.total_tokens:>10}{s.total_cost_usd:>10.5f}{s.p50_latency_ms:>8.1f}"
         )
-    print(f"\nWrote {RESULTS_DIR / 'results.csv'} and {RESULTS_DIR / 'summary.json'}")
+    print(f"\nWrote {output_dir / 'results.csv'} and {output_dir / 'summary.json'}")
 
 
 def _write_csv(results: list[RequestResult], path: Path) -> None:
