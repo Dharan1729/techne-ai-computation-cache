@@ -1,19 +1,30 @@
 """Thin wrapper around sentence-transformers for cosine-similarity matching.
 
-Same model choice this author's other project (Kairos) used —
-``sentence-transformers/all-MiniLM-L6-v2`` — for consistency with prior
-findings: that repo's own benchmark (see ``semantic caching/docker-tests``
-there) found a recall cliff for this exact model between similarity
-threshold 0.80 and 0.85, which is exactly the kind of threshold-dependence
-this project's semantic-cache baseline (§13 of the brief) is supposed to
-test explicitly rather than assume.
+Default model: ``redis/langcache-embed-v1`` — a model Redis trained
+specifically for semantic caching (not a generic sentence-similarity
+model repurposed for this task), free to download and run entirely
+locally (no API key, no network call after the first download). Chosen
+over a generic model — this project initially used
+``sentence-transformers/all-MiniLM-L6-v2`` (still available via the
+``model_name`` param) — after a direct comparison: on a genuine
+paraphrase pair from this project's own workload, MiniLM scored cosine
+similarity in the 0.3-0.5 range (see docs/experiment-log.md, H6's
+discussion of the identification-threshold tension that caused), while
+langcache-embed-v1 scored 0.77 on the same pair. RedisVL's own
+`SemanticCache` (see `benchmarks/external/redisvl_adapter.py`) defaults
+to this same model, which is also what makes the RedisVL comparison in
+`docs/experiment-log.md` an apples-to-apples "caching algorithm" test
+rather than a confounded "algorithm + embedding model" test — see that
+adapter's module docstring for how GPTCache's own default (a generic
+SBERT model) differs, and why that difference is called out explicitly
+rather than papered over.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+_MODEL_NAME = "redis/langcache-embed-v1"
 
 
 class Embedder:

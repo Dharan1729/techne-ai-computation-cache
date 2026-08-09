@@ -8,12 +8,25 @@ the same outcome distribution. Failed/superseded experiments are kept
 here, not deleted, per this project's own standard for what "honest"
 means.
 
-**Environment**: Python 3.11.8, macOS (Darwin 25.4.0), CPU only.
-Embedding model: `sentence-transformers/all-MiniLM-L6-v2`. No GPU used
-anywhere in this repo. Dependencies pinned via `pyproject.toml` (not
+**Environment**: Python 3.11.8, macOS (Darwin 25.4.0), CPU only. No GPU
+used anywhere in this repo. Dependencies pinned via `pyproject.toml` (not
 version-locked to exact patch versions as of this writing — a
 reproducibility gap flagged in `docs/architecture.md`-adjacent notes,
 not hidden).
+
+**Embedding model**: `sentence-transformers/all-MiniLM-L6-v2` through
+EXP-004; `redis/langcache-embed-v1` from EXP-005 onward (see that
+entry for why, and for the earlier-model results this project's own
+docs referenced before the switch — kept in EXP-001–EXP-004 rather than
+retroactively edited).
+
+**External comparison baselines** (EXP-006 onward): real GPTCache
+(local FAISS+SQLite) and real RedisVL (`redis/redis-stack` via Docker,
+`localhost:6379`), each run in its own dedicated virtualenv as a
+subprocess — see `benchmarks/external/` and its module docstrings for
+why they're kept out-of-process (dependency isolation) and how a run
+degrades (skips with a printed reason, doesn't fail) when either isn't
+available.
 
 ---
 
@@ -234,3 +247,164 @@ correctness): 0.80 → 59.3% / 25.3% / 74.7%; 0.85 → 44.7% / 19.3% / 80.7%;
 5. **Hierarchical / combined baseline** — a computation-cache-fallback
    that checks a semantic response cache before calling the LLM (brief's
    condition G), to test whether the two mechanisms compose or conflict.
+
+---
+
+## EXP-005 — Embedding model switch: `all-MiniLM-L6-v2` → `redis/langcache-embed-v1`
+
+**Date**: 2026-08-10
+**Motivation**: user request, prompted by two things surfacing together —
+(a) discovering a working local copy of `redis/langcache-embed-v1` was
+already validated in this environment (the sibling `semantic
+caching/docker-tests` project's own `RESULTS.md` flagged it as "a model
+Redis trained specifically for semantic caching," and had already solved
+the setup friction for it), and (b) a direct side-by-side check before
+committing to the switch.
+
+**Calibration check**: cosine similarity for a genuine paraphrase pair
+("What is 10 plus 20?" / "Calculate the sum of 10 and 20.") —
+`all-MiniLM-L6-v2`: in the 0.3–0.5 range (see EXP-002/EXP-004's H6
+discussion); `redis/langcache-embed-v1`: **0.768** on the same pair.
+
+**Re-calibration required in two places**, both done empirically rather
+than by guessing new numbers:
+
+1. **Task-identification threshold** (`TaskIdentifier`, used by the
+   computation cache). Across 150 generated requests: correct-match
+   similarities ranged 0.405–0.676; incorrect-match similarities (9
+   observed misidentifications, e.g. `percentage` confused with
+   `compound_interest`/`multiply`/`tax`/`margin` — "percent" apparently
+   a confusable token across several formula phrasings) ranged
+   0.434–0.514. A threshold sweep found **0.52** gives 0 wrong matches
+   accepted at 82.3% recall of correct matches, the best zero-error
+   point found. Old default (0.60, tuned for the previous model) would
+   have been far too strict for this model's similarity scale.
+2. **Semantic-cache threshold sweep range**. Re-ran the same
+   hit-rate/invalid-rate calibration used to pick EXP-004's sweep range:
+   at threshold 0.55, invalid-hit rate is 52.7% (the dangerous region
+   still exists!); by 0.70–0.75 it's down to 0.7–2.0%; by 0.80+ it's
+   0%. The whole "dangerous" region shifted from ~0.80–0.85 (original
+   MiniLM tuning) down to ~0.55–0.65 — the sweep range in
+   `benchmarks/run_experiment.py` was moved to match
+   (`[0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]`), not arbitrarily
+   widened.
+
+**Regression fallout** (expected, and useful): 3 of 48 existing tests
+failed after the switch — two in `tests/test_computation_cache.py`
+because a specific test phrase ("What is 512 plus 937?") happened to
+score 0.517, just under the new 0.52 threshold (swapped for an
+unambiguous phrase scoring 0.563); one in
+`tests/test_end_to_end.py::test_semantic_cache_hits_are_not_all_correct`
+because threshold 0.75 — dangerous under the old model — is now safe
+under the new one, so the test's own assumption needed updating to a
+threshold (0.60) that's still in the new dangerous region. All three
+fixes are updates to *what threshold demonstrates the phenomenon*, not
+changes to what phenomenon is being tested — see each test's updated
+docstring for the specific reasoning.
+
+**Interpretation**: this is the single highest-leverage change made in
+this project's history — see H2/H6 in `docs/hypotheses.md` for how much
+the qualitative story shifted, not just the numbers. It's also a
+reminder that this project's own earlier "semantic caching is unsafe
+under parameter variation" framing (EXP-004) was more specific than it
+first appeared: it was true for one embedding model's default behavior,
+and the room for a better model to substantially close that gap was
+real, not hypothetical.
+
+**Next**: re-run the full benchmark under the new model; separately,
+add real external-system comparison baselines (GPTCache, RedisVL) to
+check this repo's own semantic-cache reimplementation against production
+systems rather than only against itself.
+
+---
+
+## EXP-006 — Real GPTCache and RedisVL comparison baselines
+
+**Date**: 2026-08-10
+**Hypothesis under test**: none of H1–H8 directly — this tests whether
+this repo's own semantic-cache reimplementation is a fair stand-in for
+real semantic-caching systems, and separately, how much embedding-model
+choice (as opposed to caching-algorithm implementation) explains the
+semantic cache's correctness behavior.
+
+**Setup**: reused the sibling `semantic caching/docker-tests` project's
+already-solved environments — a dedicated `.venv-gptcache` (GPTCache
+0.1.44, local FAISS+SQLite, generic `all-MiniLM-L6-v2` embedding — its
+own out-of-the-box default, deliberately left unchanged, not forced to
+match this repo's embedding choice) and `.venv-redisvl` (RedisVL 0.25.1
+against a `redis/redis-stack` Docker container already running on
+`localhost:6379`, defaulting — confirmed by direct inspection, not
+assumed — to `redis/langcache-embed-v1`, the same embedding model this
+repo's own semantic cache now uses). Both run as subprocesses
+(`benchmarks/external/runner_gptcache.py`,
+`runner_redisvl.py`) communicating via a shared JSON protocol
+(`benchmarks/external/protocol.py`) — kept out-of-process specifically
+so neither system's dependency tree (torch/onnxruntime/faiss-cpu for
+GPTCache; the `redis` client for RedisVL) risks conflicting with this
+repo's own environment. On a cache miss, both runners store the exact
+same precomputed (simulated-LLM, ground-truth-correct) answer text this
+repo's own semantic-cache baseline would have stored, so all three
+systems are replaying the identical protocol over the identical
+workload.
+
+**Configuration**: same 150-request workload as EXP-004/005 (seed 42),
+same threshold sweep range as the recalibrated semantic-cache sweep
+(`[0.55, ..., 0.90]`), with RedisVL's distance-threshold convention
+converted via `distance = 1 - similarity` so all three systems' sweeps
+are aligned on the same nominal scale.
+
+**Observed** (headline row = threshold 0.75; full sweep in
+`results/results.csv` and charted in
+`results/cross_system_correctness.png`):
+
+| System | Embedding model | Hit rate | Valid | Invalid | Correctness | Tokens | Cost (USD) |
+|---|---|---|---|---|---|---|---|
+| This repo's semantic cache | `langcache-embed-v1` | 64.0% | 63.3% | 0.7% | 99.3% | 778 | 0.00120 |
+| RedisVL | `langcache-embed-v1` (its own default) | 64.0% | 63.3% | 0.7% | 99.3% | 778 | 0.00120 |
+| GPTCache | `all-MiniLM-L6-v2` (its own default) | 88.7% | 18.0% | **70.7%** | **29.3%** | 194 | 0.00033 |
+
+**This repo's semantic cache and RedisVL match to the number of
+requests** at every point in the threshold sweep, not just at 0.75 —
+see the sweep table in `results/results.csv` (`semantic_cache@*` vs.
+`redisvl@*` rows). GPTCache's own sweep (`gptcache@*` rows) shows
+correctness climbing from 2.0% (threshold 0.55) to 74.7% (threshold
+0.90) — still worse than semantic_cache/RedisVL's *worst* tested point
+(47.3% at their most dangerous threshold, 0.55) until GPTCache's
+threshold is pushed well past 0.90.
+
+**Interpretation**:
+
+- **This repo's own semantic-cache reimplementation is not a strawman.**
+  Matching a real, independently-implemented, widely-used system
+  (RedisVL) within noise at every threshold is strong evidence the
+  earlier baselines (and by extension the computation-cache comparison
+  against them) aren't artifacts of a weak or unusually bad reference
+  implementation.
+- **Embedding model choice is at least as load-bearing as caching
+  algorithm choice, for this workload.** Two systems built on similar
+  architecture (embed the request, nearest-neighbor search, threshold
+  cutoff) diverge by up to ~70 percentage points of correctness at the
+  identical nominal threshold, purely because of which embedding model
+  each defaults to. This corroborates — with a controlled sweep, on a
+  different workload — the qualitative finding the sibling
+  `docker-tests` project's `RESULTS.md` first flagged.
+- **This sharpens, rather than undercuts, the case for computation
+  caching.** A good embedding model can make semantic response caching
+  *safe in practice* at the right threshold — but "safe in practice, at
+  a threshold someone has to find and defend" is a materially weaker
+  correctness guarantee than "correct by construction, because nothing
+  is ever reused from a prior response" (the computation cache's actual
+  property, unaffected by embedding-model choice since its identification
+  failures are caught by parameter validation, not left to hope). Both
+  can be true at once: semantic caching-with-a-good-embedding-model is a
+  credible engineering choice for many workloads, and computation
+  caching offers a stronger guarantee where the task structure permits
+  it.
+
+**Next experiments**: real-backend validation (Gemini) remains the
+top item — see EXP-004's list, item 3, now updated to note a
+`GEMINI_API_KEY` was provided by the user; results pending a dedicated
+run (see `docs/experiment-log.md`'s next update, or `results/` for
+whether one has landed by the time this is read). Workload-repetition
+sweep (H5) and Level 3 prototype remain unstarted, per EXP-004's
+original list.

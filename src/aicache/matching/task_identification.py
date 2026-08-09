@@ -30,7 +30,14 @@ class IdentificationResult:
 
 
 class TaskIdentifier:
-    def __init__(self, embedder: Embedder | None = None, threshold: float = 0.60) -> None:
+    # 0.52, calibrated against langcache-embed-v1 on this project's own
+    # workload (see docs/experiment-log.md): zero misidentified matches
+    # observed at this threshold across 150 generated requests, while
+    # still accepting ~82% of genuinely-correct matches. Not a
+    # theoretical optimum — an empirically-checked value for this
+    # embedding model and this workload, documented as such rather than
+    # asserted as a universal default.
+    def __init__(self, embedder: Embedder | None = None, threshold: float = 0.52) -> None:
         self.embedder = embedder or Embedder()
         self.threshold = threshold
         self._example_texts: list[str] = []

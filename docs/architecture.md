@@ -118,6 +118,33 @@ truth with a small tolerance (see that module's docstring for why the
 tolerance isn't zero). This is what makes it possible to measure, not
 assume, whether a "hit" was actually correct.
 
+## External comparison baselines (GPTCache, RedisVL)
+
+Two real, independently-implemented semantic-caching systems run
+alongside this repo's own four conditions, as an optional fifth/sixth
+data point rather than a fifth/sixth *design* — `benchmarks/external/`.
+Both are driven through the identical request-by-request protocol as
+this repo's own `semantic_cache` baseline (see
+`benchmarks/external/protocol.py`): on a miss, store the same
+precomputed, ground-truth-correct answer text every baseline in this
+repo would have stored; on a hit, report whatever the external system
+actually served, so its correctness can be checked exactly the way this
+repo checks its own.
+
+Each runs **out-of-process**, as a subprocess into its own dedicated
+virtualenv (`runner_gptcache.py`, `runner_redisvl.py`), specifically so
+GPTCache's dependency tree (torch, onnxruntime, faiss-cpu) or RedisVL's
+(a Redis client) can never conflict with this repo's own environment —
+a real risk given GPTCache alone pulls in a different major version of
+several packages this repo's own `sentence-transformers` dependency also
+uses. RedisVL additionally requires a reachable Redis instance with
+vector search support (e.g. `redis/redis-stack` via Docker). Both are
+optional: `benchmarks/run_experiment.py` checks availability up front
+and skips either one gracefully (printing why) rather than failing the
+whole run — this repo's own four baselines never depend on either being
+present. See `docs/experiment-log.md` (EXP-006) for what running them
+found.
+
 ## Deferred: hierarchical caching (brief §16)
 
 The brief poses a hierarchical-cache hypothesis — L0 exact response, L1

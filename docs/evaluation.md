@@ -43,6 +43,20 @@ and reporting mean/variance is mechanically straightforward — it simply
 wasn't done in this pass, and is listed as follow-up work rather than
 silently implied to have been done.
 
+## External baselines (GPTCache, RedisVL)
+
+Same correctness methodology as this repo's own baselines
+(`is_correct` against independent ground truth), applied to whatever
+text the external system actually served — see
+`docs/architecture.md`'s "External comparison baselines" section for
+the subprocess/protocol mechanics. One methodological note specific to
+these two: **both are optional and environment-dependent** (a specific
+local venv layout, and for RedisVL, a reachable Redis instance) — a
+reader who clones this repo without that exact local setup will see
+`benchmarks/run_experiment.py` skip them with a printed reason rather
+than reproduce their rows in `results/results.csv`. This repo's own
+four baselines never depend on either being present, by design.
+
 ## Reproducibility
 
 - Python 3.11.8, macOS (Darwin), CPU only — see

@@ -44,20 +44,27 @@ def test_exact_cache_never_hits_on_paraphrased_workload():
 def test_semantic_cache_hits_are_not_all_correct(embedder):
     """RQ2/RQ3, the central empirical finding: at a threshold loose
     enough to produce real reuse, some of that reuse serves a stale,
-    wrong answer. This test only requires that SOME invalid hit occurs
-    somewhere in a reasonably large, repeated-structure workload — not a
-    specific rate, since that's threshold- and workload-dependent (see
-    docs/experiment-log.md for the measured rate at threshold 0.75)."""
+    wrong answer. redis/langcache-embed-v1 (this project's default
+    embedding model, chosen for being purpose-built for semantic
+    caching — see aicache/matching/embedder.py) is meaningfully better
+    at separating "genuine paraphrase" from "same wording, different
+    numbers" than a generic sentence-similarity model, so the failure
+    mode this test demonstrates now requires a looser threshold (0.60)
+    to reliably reproduce than it did before that model switch (0.75) —
+    see docs/experiment-log.md for the full calibration and what it
+    means for H2's status. The mechanism itself — some non-zero
+    false-hit rate at a loose-enough threshold — has not gone away, only
+    the threshold at which it appears."""
     workload = generate_workload(param_sets_per_task=4, paraphrases_per_param_set=3, seed=11)
-    results = run_semantic_cache(workload, SimulatedLLM(seed=0), threshold=0.75, embedder=embedder)
+    results = run_semantic_cache(workload, SimulatedLLM(seed=0), threshold=0.60, embedder=embedder)
     invalid = [r for r in results if r.outcome == Outcome.HIT_INVALID]
     valid = [r for r in results if r.outcome == Outcome.HIT_VALID]
     assert len(valid) + len(invalid) > 0, "expected at least some semantic hits on this workload"
     assert len(invalid) > 0, (
-        "expected at least one false hit under parameter variation — if this "
-        "starts failing, either the workload got easier or the caching bug "
-        "this baseline is supposed to demonstrate got fixed (which would be "
-        "a different kind of interesting)"
+        "expected at least one false hit under parameter variation at this "
+        "loose threshold — if this starts failing, either the workload got "
+        "easier or the caching bug this baseline is supposed to demonstrate "
+        "got fixed (which would be a different kind of interesting)"
     )
 
 

@@ -1,95 +1,136 @@
 # Hypotheses
 
 Written before reading results (in spirit — see `docs/experiment-log.md`
-for the actual chronology, including one iteration where a workload bug
-had to be found and fixed before these could be evaluated honestly).
-Each is evaluated against the single experiment run documented in
-`docs/experiment-log.md` (workload: 150 requests, 9 task types, seed 42,
-simulated backend). Numbers below are from that run; re-running with a
-different seed or workload size will shift exact figures without
-changing the qualitative pattern, per the repeated-runs caveat in
-`docs/experiment-log.md`.
+for the actual chronology, including several iterations where bugs had
+to be found and fixed, and one where the embedding model itself was
+swapped mid-project after an explicit comparison, before these could be
+evaluated honestly). Each is evaluated against the final experiment run
+documented in `docs/experiment-log.md` (EXP-006; 150 requests, 9 task
+types, seed 42, simulated LLM backend, `redis/langcache-embed-v1`
+embeddings, plus real GPTCache and RedisVL comparison baselines).
+Numbers below are from that run; re-running with a different seed or
+workload size will shift exact figures without changing the qualitative
+pattern, per the repeated-runs caveat in `docs/evaluation.md`.
 
 ### H1 — Semantic response caching will outperform exact caching when requests are semantically equivalent.
 
 **Supported.** Exact cache: 0% hit rate on this workload (paraphrased,
-parameter-varying requests are never byte-identical). Semantic cache
-(threshold 0.75): 72.7% hit rate. This is the expected, unsurprising
-result that motivates semantic caching in the first place.
+parameter-varying requests are never byte-identical). Semantic cache:
+64.0% hit rate. Unsurprising, and exactly why semantic caching exists.
 
 ### H2 — Semantic response caching will struggle when parameter values materially affect outputs.
 
-**Supported, more starkly than expected.** Of the semantic cache's 72.7%
-hit rate at threshold 0.75, only 36.7 percentage points were valid hits —
-36.0 percentage points were invalid hits (a reused answer that doesn't
-match the current request's own ground truth). Overall correctness on
-this baseline was 64.0%, i.e. more than a third of all requests received
-a wrong answer, silently, with no error signal distinguishing a wrong
-answer from a right one at the API-response level.
+**Supported at a loose threshold; largely refuted at a well-chosen
+threshold with a strong embedding model — this hypothesis needed a
+second variable added to be evaluated honestly.** The original version
+of this experiment (see EXP-004 in `docs/experiment-log.md`) used a
+generic sentence-similarity model (`all-MiniLM-L6-v2`) and found a 36.0%
+invalid-hit rate at threshold 0.75. After switching to
+`redis/langcache-embed-v1` — a model purpose-trained for semantic
+caching, not a generic-model swap chosen to flatter the result (see
+EXP-005) — that same threshold produces only a **0.7% invalid-hit rate**
+(99.3% overall correctness) on this workload. The failure mode H2
+predicts is real and reproduces reliably, but the *threshold at which it
+appears* moved from ~0.75 down to ~0.55–0.60 once a better embedding
+model was in use (see the full sweep in EXP-006). **Revised reading**:
+H2 is a property of (embedding model × threshold), not of semantic
+caching as an approach in the abstract — and the choice of embedding
+model turned out to matter as much as, or more than, the threshold
+itself. This is echoed almost exactly by real-system results: RedisVL
+(same embedding model as this repo's own reimplementation) lands within
+noise of this repo's own numbers at every threshold tested (64.0% hit /
+0.7% invalid at 0.75, for both); GPTCache (generic SBERT default)
+shows 88.7% hit / **70.7% invalid** at the identical threshold — see H2's
+extension into cross-system terms below.
 
 ### H3 — Computation caching can achieve reuse when computational structure remains stable while parameters change.
 
-**Supported.** The computation cache reached a 50.0% hit rate — every
-hit executed the identified operation fresh, on freshly bound
-parameters, for a **0% invalid-hit rate** (100% correctness on every
-request, including the fallback half). This is the central positive
-result: reuse without correctness risk on this workload.
+**Supported, more strongly than in the earlier (weaker-embedding-model)
+run.** The computation cache reached a 77.3% hit rate (up from 50.0% in
+EXP-004, once identification threshold + embedding model were
+recalibrated in EXP-005) — every hit executed the identified operation
+fresh, on freshly bound parameters, for a **0% invalid-hit rate** (100%
+correctness on every request, including the 22.7% that fell back to the
+LLM).
 
 ### H4 — Computation caching can reduce LLM calls without requiring stale response reuse.
 
-**Supported.** 50% of requests never touched the LLM backend at all
-(zero tokens, zero cost, sub-millisecond latency on top of a real,
-measured embedding-lookup + parameter-extraction + execution cost). The
-other 50% fell back to a full LLM call — by design, whenever
-identification or binding couldn't be validated, rather than guessing.
+**Supported.** 77.3% of requests never touched the LLM backend at all
+(zero tokens, zero cost). Total tokens: 346 vs. 2193 for no-cache — an
+84.2% reduction, the largest of any condition tested including the
+semantic caches. The remaining 22.7% fell back to a full LLM call by
+design, whenever identification or binding couldn't be validated.
 
 ### H5 — Computation reuse will produce higher benefits on structurally repetitive workloads.
 
-**Not independently tested in this run.** The workload here already has
-maximal structural repetition by construction (9 fixed task types, many
-parameter draws and paraphrases each) — there's no lower-repetition
-condition in this experiment to compare against. Testing this properly
-needs a workload-repetition sweep (e.g. vary the number of distinct task
-types per fixed request count), which is listed as a next experiment in
-`docs/experiment-log.md` rather than fabricated here.
+**Not independently tested in this run.** Unchanged from the prior
+assessment — see `docs/experiment-log.md`'s "next experiments" list for
+the workload-repetition sweep this would require.
 
 ### H6 — Computation reuse will fail when task structure changes substantially.
 
-**Supported, and observed in a form worth flagging.** The task
-*identification* step itself has a real, measured failure mode
-independent of "structure changing": for terse arithmetic phrasings,
-absolute cosine similarity against canonical examples runs
-surprisingly low (roughly 0.3–0.5 for genuinely-correct matches with
-`sentence-transformers/all-MiniLM-L6-v2`), and in at least one observed
-case a *different* task's phrasing ("subtract") scored higher against
-the wrong canonical task ("add", similarity 0.457) than several
-*correct* matches scored against their own right task (`multiply` at
-0.308, `add` at 0.453). This means similarity magnitude does not
-monotonically separate correct from incorrect identification for this
-embedding model on this workload — a genuine limitation, not a tuning
-inconvenience, documented in `docs/experiment-log.md`'s failure-analysis
-section. The threshold chosen for the headline run (0.60) was picked
-specifically because it happened to reject the one wrong-match instance
-observed in a small sample, at the cost of also rejecting several
-correct low-similarity matches (hence the 50% fallback rate) — an
-explicit, acknowledged trade-off, not a tuned "best" value.
+**Supported in a narrower, now well-characterized form.** With
+`all-MiniLM-L6-v2` (EXP-004), identification similarity didn't
+monotonically separate correct from incorrect task matches at all — a
+wrong match could outscore several correct ones. With
+`redis/langcache-embed-v1` (EXP-005), that problem shrank substantially
+but didn't disappear: across 150 requests, correct-match similarities
+ranged 0.405–0.676 while incorrect-match similarities ranged up to
+0.514 — a real overlap zone, just a much narrower one. The calibrated
+threshold (0.52) sits inside that zone by design, accepting the
+trade-off of zero observed misidentifications against a real fallback
+cost (see H4). **Revised reading**: this is the same underlying finding
+as the H2 revision — embedding model quality is a first-order variable
+for this whole approach, not a detail — but computation caching has a
+structural advantage semantic response caching doesn't: a
+misidentification here is caught downstream by parameter-count/type
+validation whenever binding fails, whereas a semantic cache's false hit
+is caught by nothing (see `docs/architecture.md`'s validation-as-hard-gate
+design note).
 
 ### H7 — Hit rate alone will not correlate perfectly with inference-cost savings.
 
-**Supported by construction and confirmed in the numbers.** The
-semantic cache's 72.7% hit rate is *higher* than the computation cache's
-50.0% hit rate, yet the computation cache saves more total cost (tokens:
-749 vs. 2193 for no-cache — a computation-cache reduction of ~66%,
-vs. semantic cache's reduction to 527 tokens, ~76% token reduction but
-attached to a correctness rate of only 64%). Reading hit rate alone
-would rank semantic caching as more effective; reading hit rate together
-with the valid/invalid split and correctness rate reverses that
-conclusion for any use case where wrong answers have a cost.
+**Supported, and now demonstrable across real systems, not just this
+repo's own baselines.** GPTCache shows the *highest* raw hit rate of any
+condition tested (88.7%) and the *worst* correctness (29.3%) — reading
+hit rate alone would rank it best; reading it with the valid/invalid
+split reverses that completely. Even between the two safe conditions,
+hit rate ranks them oppositely from a naive "bigger is better" reading:
+computation cache (77.3% hit) beats semantic cache/RedisVL (64.0% hit)
+on both hit rate and total cost ($0.00061 vs. $0.00120) simultaneously —
+consistent, not contradictory, in this specific comparison, but the
+GPTCache case shows why hit rate can't be trusted as a sufficient
+statistic on its own.
 
 ### H8 — Cost-aware retention can outperform frequency-only policies under heterogeneous computation costs.
 
 **Explicitly out of scope for this prototype — future work, not
-tested.** See `docs/eviction-future-work.md`. This prototype's caches
-have unbounded, unevicting memory; no admission/eviction policy of any
-kind is implemented or compared. Do not read anything in this repo's
-results as evidence for or against H8.
+tested.** See `docs/eviction-future-work.md`. Unchanged.
+
+---
+
+## Addendum: what the GPTCache/RedisVL comparison adds
+
+Not one of the original eight hypotheses, but the finding those two
+real-system baselines produced deserves its own statement, since it's
+arguably the single most load-bearing result in this repo:
+
+> **On this workload, this repo's own from-scratch semantic-cache
+> reimplementation is statistically indistinguishable from RedisVL's
+> production implementation at every threshold tested** (hit rate,
+> valid-hit rate, and invalid-hit rate all match within noise — see
+> `results/cross_system_correctness.png`), **while GPTCache's
+> out-of-the-box configuration — a different, generic embedding model,
+> not a different caching algorithm — produces a 70-percentage-point
+> worse correctness rate at the identical nominal threshold.**
+
+This does two things for the project's credibility that comparing only
+against a self-written baseline couldn't: it validates that this
+repo's own semantic-cache implementation isn't a strawman built to lose
+to the computation cache (it matches a real, widely-used system almost
+exactly), and it isolates *embedding model choice* as a variable that
+matters as much as — on this workload, more than — the caching algorithm
+itself, a finding this project's own earlier research (the sibling
+`semantic caching/docker-tests` spike) had already flagged qualitatively
+and this run now confirms quantitatively, on a different workload, with
+a controlled sweep.

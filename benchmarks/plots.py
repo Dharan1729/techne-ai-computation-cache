@@ -50,17 +50,28 @@ plt.rcParams.update(
     }
 )
 
-BASELINE_ORDER = ["no_cache", "exact_cache", "semantic_cache", "computation_cache"]
+BASELINE_ORDER = [
+    "no_cache",
+    "exact_cache",
+    "semantic_cache",
+    "gptcache",
+    "redisvl",
+    "computation_cache",
+]
 BASELINE_LABEL = {
     "no_cache": "A: No cache",
     "exact_cache": "B: Exact cache",
-    "semantic_cache": "C: Semantic cache\n(threshold 0.75)",
-    "computation_cache": "D: Computation cache\n(this repo's hypothesis)",
+    "semantic_cache": "C: Semantic cache\n(this repo)",
+    "gptcache": "GPTCache\n(generic SBERT)",
+    "redisvl": "RedisVL\n(langcache-embed)",
+    "computation_cache": "D: Computation\ncache (hypothesis)",
 }
 BASELINE_COLOR = {
     "no_cache": GRAY,
     "exact_cache": GRAY,
     "semantic_cache": ORANGE,
+    "gptcache": YELLOW,
+    "redisvl": AQUA,
     "computation_cache": BLUE,
 }
 
@@ -80,8 +91,8 @@ def _savefig(fig, name: str) -> None:
 
 
 def plot_hit_rate_by_baseline(summary: dict) -> None:
-    fig, ax = plt.subplots(figsize=(6.5, 4.2))
-    xs = BASELINE_ORDER
+    xs = [b for b in BASELINE_ORDER if b in summary]
+    fig, ax = plt.subplots(figsize=(10.5, 5.0))
     valid = [summary[b]["valid_hit_rate"] * 100 for b in xs]
     invalid = [summary[b]["invalid_hit_rate"] * 100 for b in xs]
 
@@ -95,38 +106,55 @@ def plot_hit_rate_by_baseline(summary: dict) -> None:
         label="Invalid hit (answer wrong)",
     )
     ax.set_xticks(range(len(xs)))
-    ax.set_xticklabels([BASELINE_LABEL[b] for b in xs], fontsize=8.5)
+    ax.set_xticklabels([BASELINE_LABEL[b] for b in xs], fontsize=8)
     ax.set_ylabel("Share of requests (%)")
-    ax.set_title("Cache hit rate, split by correctness")
+    ax.set_title(
+        "Cache hit rate, split by correctness\n"
+        "this repo's baselines + real GPTCache/RedisVL — semantic-family bars at similarity threshold 0.75"
+    )
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
     ax.legend(frameon=False, fontsize=8.5, loc="upper left")
     _savefig(fig, "hit_rate_by_baseline.png")
 
 
+_SHORT_LABEL = {
+    "no_cache": "A: No cache",
+    "exact_cache": "B: Exact cache",
+    "semantic_cache": "C: Semantic (this repo)",
+    "gptcache": "GPTCache",
+    "redisvl": "RedisVL",
+    "computation_cache": "D: Computation cache",
+}
+
+
 def plot_tokens_and_cost(summary: dict) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.2))
-    xs = BASELINE_ORDER
+    xs = [b for b in BASELINE_ORDER if b in summary]
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5.0))
 
     tokens = [summary[b]["total_tokens"] for b in xs]
     axes[0].bar(xs, tokens, color=[BASELINE_COLOR[b] for b in xs])
     axes[0].set_ylabel("Total tokens (input + output)")
     axes[0].set_title("Tokens consumed")
     axes[0].set_xticks(range(len(xs)))
-    axes[0].set_xticklabels([BASELINE_LABEL[b] for b in xs], fontsize=8, rotation=0)
+    axes[0].set_xticklabels(
+        [_SHORT_LABEL[b] for b in xs], fontsize=8.5, rotation=25, ha="right"
+    )
 
     cost = [summary[b]["total_cost_usd"] for b in xs]
     axes[1].bar(xs, cost, color=[BASELINE_COLOR[b] for b in xs])
     axes[1].set_ylabel("Simulated inference cost (USD)")
     axes[1].set_title("Cost (simulated backend, Haiku 4.5 pricing)")
     axes[1].set_xticks(range(len(xs)))
-    axes[1].set_xticklabels([BASELINE_LABEL[b] for b in xs], fontsize=8, rotation=0)
+    axes[1].set_xticklabels(
+        [_SHORT_LABEL[b] for b in xs], fontsize=8.5, rotation=25, ha="right"
+    )
 
     _savefig(fig, "tokens_and_cost_by_baseline.png")
 
 
 def plot_latency(summary: dict) -> None:
-    fig, ax = plt.subplots(figsize=(6.5, 4.2))
-    xs = BASELINE_ORDER
+    xs = [b for b in BASELINE_ORDER if b in summary]
+    fig, ax = plt.subplots(figsize=(9.5, 4.6))
     p50 = [summary[b]["p50_latency_ms"] for b in xs]
     p95 = [summary[b]["p95_latency_ms"] for b in xs]
     width = 0.35
@@ -134,17 +162,21 @@ def plot_latency(summary: dict) -> None:
     ax.bar([i - width / 2 for i in idx], p50, width=width, color=BLUE, label="p50")
     ax.bar([i + width / 2 for i in idx], p95, width=width, color=SEQ_BLUE[1], label="p95")
     ax.set_xticks(list(idx))
-    ax.set_xticklabels([BASELINE_LABEL[b] for b in xs], fontsize=8.5)
-    ax.set_ylabel("Latency (ms, simulated)")
+    ax.set_xticklabels([_SHORT_LABEL[b] for b in xs], fontsize=8.5, rotation=20, ha="right")
+    ax.set_ylabel("Latency (ms; simulated LLM, real cache/embedding lookups)")
     ax.set_title("Request latency")
     ax.legend(frameon=False, fontsize=8.5)
     _savefig(fig, "latency_by_baseline.png")
 
 
+SEMANTIC_SWEEP_THRESHOLDS = [0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
+
+
 def plot_semantic_threshold_sweep(summary: dict) -> None:
-    thresholds = [0.80, 0.85, 0.90, 0.92, 0.95, 0.97]
-    labels = [f"semantic_cache@{t:.2f}" for t in thresholds]
-    present = [(t, s) for t, s in zip(thresholds, labels) if s in summary]
+    """Our own semantic-cache reimplementation only — hit rate / false-hit
+    rate / correctness across the threshold sweep."""
+    labels = [f"semantic_cache@{t:.2f}" for t in SEMANTIC_SWEEP_THRESHOLDS]
+    present = [(t, s) for t, s in zip(SEMANTIC_SWEEP_THRESHOLDS, labels) if s in summary]
     if not present:
         print("no threshold-sweep data found (run without --skip-threshold-sweep)")
         return
@@ -171,9 +203,45 @@ def plot_semantic_threshold_sweep(summary: dict) -> None:
     ax.set_xlabel("Semantic similarity threshold")
     ax.set_ylabel("Share of requests (%)")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
-    ax.set_title("Semantic cache: hit rate vs. correctness across thresholds")
+    ax.set_title("This repo's semantic cache: hit rate vs. correctness across thresholds")
     ax.legend(frameon=False, fontsize=8.5)
     _savefig(fig, "semantic_threshold_sweep.png")
+
+
+def plot_cross_system_correctness(summary: dict) -> None:
+    """The headline cross-system chart: correctness across the SAME
+    threshold sweep for this repo's own semantic cache, real GPTCache,
+    and real RedisVL — isolating "embedding model" as the variable that
+    matters most (this repo's cache and RedisVL both default to
+    redis/langcache-embed-v1 and land on nearly identical curves; GPTCache's
+    generic-SBERT default is the outlier)."""
+    systems = [
+        ("semantic_cache", "This repo's semantic cache\n(langcache-embed-v1)", BLUE, "-"),
+        ("redisvl", "RedisVL\n(langcache-embed-v1, same model)", AQUA, "--"),
+        ("gptcache", "GPTCache\n(generic SBERT MiniLM)", YELLOW, "-"),
+    ]
+    fig, ax = plt.subplots(figsize=(7.5, 4.8))
+    any_plotted = False
+    for key, label, color, style in systems:
+        labels = [f"{key}@{t:.2f}" for t in SEMANTIC_SWEEP_THRESHOLDS]
+        present = [(t, s) for t, s in zip(SEMANTIC_SWEEP_THRESHOLDS, labels) if s in summary]
+        if not present:
+            continue
+        any_plotted = True
+        xs = [t for t, _ in present]
+        correctness = [summary[s]["correctness_rate"] * 100 for _, s in present]
+        ax.plot(xs, correctness, marker="o", color=color, linestyle=style, linewidth=2, label=label)
+    if not any_plotted:
+        print("no external-system sweep data found (run without --skip-external)")
+        plt.close(fig)
+        return
+    ax.set_xlabel("Similarity threshold (same convention across all three)")
+    ax.set_ylabel("Overall correctness (%)")
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.set_ylim(0, 105)
+    ax.set_title("Correctness vs. threshold: same algorithm family, different embedding models")
+    ax.legend(frameon=False, fontsize=8)
+    _savefig(fig, "cross_system_correctness.png")
 
 
 def main() -> None:
@@ -182,6 +250,7 @@ def main() -> None:
     plot_tokens_and_cost(summary)
     plot_latency(summary)
     plot_semantic_threshold_sweep(summary)
+    plot_cross_system_correctness(summary)
 
 
 if __name__ == "__main__":

@@ -29,12 +29,20 @@ from benchmarks.baselines import (
     run_no_cache,
     run_semantic_cache,
 )
+from benchmarks.external import gptcache_adapter, redisvl_adapter
 from workloads.generators import generate_workload
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = REPO_ROOT / "results"
 
-SEMANTIC_THRESHOLDS = [0.80, 0.85, 0.90, 0.92, 0.95, 0.97]
+# Calibrated against redis/langcache-embed-v1 (see docs/experiment-log.md):
+# this model separates genuine-paraphrase similarity from
+# different-parameter similarity much more sharply than a generic
+# sentence-similarity model, so the "dangerous" region of this sweep
+# sits lower (0.55-0.65) than it did under this project's original
+# MiniLM-based embedder (0.80-0.85) — the sweep range moved with it,
+# not arbitrarily widened.
+SEMANTIC_THRESHOLDS = [0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
 
 
 def main() -> None:
@@ -50,6 +58,11 @@ def main() -> None:
         help="Threshold used for the headline semantic_cache condition (the sweep runs separately at fixed thresholds above)",
     )
     ap.add_argument("--skip-threshold-sweep", action="store_true")
+    ap.add_argument(
+        "--skip-external",
+        action="store_true",
+        help="Skip the GPTCache/RedisVL comparison baselines even if available",
+    )
     args = ap.parse_args()
 
     print(f"[config] backend={args.backend} seed={args.seed}")
@@ -67,10 +80,16 @@ def main() -> None:
 
     all_results: list[RequestResult] = []
 
-    def run(name: str, fn) -> None:
+    def run(name: str, fn, optional: bool = False) -> None:
         t0 = time.perf_counter()
         llm = make_backend(args.backend)
-        results = fn(workload, llm)
+        try:
+            results = fn(workload, llm)
+        except (gptcache_adapter.GPTCacheUnavailable, redisvl_adapter.RedisVLUnavailable) as exc:
+            if optional:
+                print(f"[{name}] SKIPPED — {exc}")
+                return
+            raise
         elapsed = time.perf_counter() - t0
         all_results.extend(results)
         n_hit = sum(1 for r in results if r.outcome.value.startswith("hit"))
@@ -80,6 +99,22 @@ def main() -> None:
     run("exact_cache", run_exact_cache)
     run("semantic_cache", lambda wl, llm: run_semantic_cache(wl, llm, threshold=args.semantic_threshold, embedder=embedder))
     run("computation_cache", run_computation_cache)
+
+    if not args.skip_external:
+        gc_ok, gc_reason = gptcache_adapter.is_available()
+        rv_ok, rv_reason = redisvl_adapter.is_available()
+        print(f"[external] gptcache available={gc_ok} ({gc_reason or 'ok'}); redisvl available={rv_ok} ({rv_reason or 'ok'})")
+
+        run(
+            "gptcache",
+            lambda wl, llm: gptcache_adapter.run_gptcache(wl, llm, threshold=args.semantic_threshold),
+            optional=True,
+        )
+        run(
+            "redisvl",
+            lambda wl, llm: redisvl_adapter.run_redisvl(wl, llm, similarity_threshold=args.semantic_threshold),
+            optional=True,
+        )
 
     if not args.skip_threshold_sweep:
         for thresh in SEMANTIC_THRESHOLDS:
@@ -92,6 +127,26 @@ def main() -> None:
                 return results
 
             run(label, fn)
+
+        if not args.skip_external:
+            for thresh in SEMANTIC_THRESHOLDS:
+                gc_label = f"gptcache@{thresh:.2f}"
+                rv_label = f"redisvl@{thresh:.2f}"
+
+                def gc_fn(wl, llm, thresh=thresh, label=gc_label):
+                    results = gptcache_adapter.run_gptcache(wl, llm, threshold=thresh)
+                    for r in results:
+                        r.baseline = label
+                    return results
+
+                def rv_fn(wl, llm, thresh=thresh, label=rv_label):
+                    results = redisvl_adapter.run_redisvl(wl, llm, similarity_threshold=thresh)
+                    for r in results:
+                        r.baseline = label
+                    return results
+
+                run(gc_label, gc_fn, optional=True)
+                run(rv_label, rv_fn, optional=True)
 
     RESULTS_DIR.mkdir(exist_ok=True)
     _write_csv(all_results, RESULTS_DIR / "results.csv")

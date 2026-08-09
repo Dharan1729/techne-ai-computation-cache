@@ -76,7 +76,17 @@ and are explicitly out of scope for this prototype — see
   real (token-count heuristic, published pricing) vs. synthetic (latency
   distribution) about it) and a pluggable, real **Gemini** backend
   (`aicache/llm/gemini.py`, inactive unless `GEMINI_API_KEY` is set).
-- Embedding model: `sentence-transformers/all-MiniLM-L6-v2`, CPU only.
+- Embedding model: `redis/langcache-embed-v1` — chosen after directly
+  comparing it against a generic sentence-similarity model and finding
+  it separates genuine paraphrases from different-parameter requests far
+  more sharply (see `docs/experiment-log.md`, EXP-005, and
+  `aicache/matching/embedder.py`'s docstring).
+- **External comparison baselines**: real GPTCache and real RedisVL,
+  each run through the identical protocol as this repo's own semantic
+  cache, in their own dependency-isolated subprocesses — see
+  `docs/architecture.md`'s "External comparison baselines" section.
+  Optional: skipped gracefully if the required venv/Redis instance isn't
+  present.
 - Metrics: hit/valid-hit/invalid-hit/miss/fallback rates, correctness
   (checked independently against ground truth, not assumed from
   outcome), tokens, cost, latency — see `docs/evaluation.md`.
@@ -85,41 +95,54 @@ Run it:
 
 ```
 pip install -e .
-python -m pytest tests/ -q                    # 48 tests
+python -m pytest tests/ -q                    # 51 tests (48 always run + 3 external, auto-skipped if unavailable)
 python -m benchmarks.run_experiment           # writes results/results.csv, results/summary.json
 python -m benchmarks.plots                    # writes results/*.png
 ```
 
 ## Results
 
-From the run documented in full in `docs/experiment-log.md` (EXP-004;
-150 requests, seed 42, simulated backend):
+From the run documented in full in `docs/experiment-log.md` (EXP-006;
+150 requests, seed 42, simulated LLM backend, `redis/langcache-embed-v1`
+embeddings):
 
 | Baseline | Hit rate | Valid | Invalid | Correctness | Tokens | Cost (USD) |
 |---|---|---|---|---|---|---|
 | A — No cache | 0.0% | — | — | 100.0% | 2193 | 0.00338 |
 | B — Exact cache | 0.0% | 0.0% | 0.0% | 100.0% | 2193 | 0.00338 |
-| C — Semantic cache (threshold 0.75) | 72.7% | 36.7% | **36.0%** | **64.0%** | 527 | 0.00085 |
-| D — Computation cache | 50.0% | 50.0% | **0.0%** | **100.0%** | 749 | 0.00134 |
+| C — This repo's semantic cache (0.75) | 64.0% | 63.3% | 0.7% | 99.3% | 778 | 0.00120 |
+| **RedisVL** (real system, same embedding model) | 64.0% | 63.3% | 0.7% | 99.3% | 778 | 0.00120 |
+| **GPTCache** (real system, generic embedding model) | 88.7% | 18.0% | **70.7%** | **29.3%** | 194 | 0.00033 |
+| D — Computation cache | 77.3% | 77.3% | **0.0%** | **100.0%** | 346 | 0.00061 |
 
 ![Hit rate split by correctness](results/hit_rate_by_baseline.png)
 
-The semantic-cache threshold sweep (0.80 → 0.97) shows this isn't a
-tuning problem: correctness only approaches 100% once the hit rate has
-collapsed to ~3–5%, and no threshold in the swept range beats the
-computation cache's (50% hit, 100% correct) point on both axes at once.
+**Two findings, not one.** First — the credibility check: this repo's
+own from-scratch semantic-cache reimplementation matches RedisVL's real,
+production implementation *within noise, at every threshold tested*.
+It isn't a strawman.
 
-![Semantic cache threshold sweep](results/semantic_threshold_sweep.png)
+![Correctness vs threshold across three real systems](results/cross_system_correctness.png)
 
-**Headline finding**: on this workload, semantic response caching's
-higher raw hit rate (72.7% vs. 50.0%) is not the better outcome once
-correctness is accounted for — more than a third of its "hits" served a
-wrong answer, silently. The computation cache traded some coverage
-(50% fallback rate, by design, whenever task identification or parameter
-binding couldn't be validated) for zero observed invalid hits. Full
-numbers, the threshold sweep, and interpretation: `docs/experiment-log.md`.
-All four remaining charts (`tokens_and_cost_by_baseline.png`,
-`latency_by_baseline.png`) are in `results/`.
+Second — embedding model choice turns out to matter as much as, or more
+than, caching algorithm choice: GPTCache's own out-of-the-box embedding
+default trails RedisVL/this-repo's-cache by up to 70 percentage points
+of correctness at the *identical* nominal threshold, on the *identical*
+workload, run through the *identical* protocol. The full sweep
+(`results/semantic_threshold_sweep.png`) shows this isn't fixable by
+retuning GPTCache's threshold alone within any reasonable range.
+
+**Headline finding, computation vs. response caching**: the computation
+cache reaches a *higher* hit rate (77.3%) than any of the three
+semantic-response-cache configurations at their safe operating point,
+at *zero* observed invalid hits and the lowest token/cost footprint of
+any caching condition tested (346 tokens / $0.00061, an 84% reduction
+vs. no-cache). Its 22.7% fallback rate is a deliberate, correctness-preserving
+refusal to guess, not a failure. Full numbers and interpretation:
+`docs/experiment-log.md` (EXP-004 through EXP-006). All charts
+(`tokens_and_cost_by_baseline.png`, `latency_by_baseline.png`,
+`semantic_threshold_sweep.png`, `cross_system_correctness.png`) are in
+`results/`.
 
 ## Limitations
 
@@ -133,20 +156,26 @@ All four remaining charts (`tokens_and_cost_by_baseline.png`,
   (`aicache/binding/extractor.py`); two template bugs exploiting exactly
   this limitation were found and fixed during development (see
   `docs/experiment-log.md`, EXP-002/EXP-003) — not swept under the rug.
-- **Task-identification threshold is a real, unresolved trade-off** — see
-  H6 in `docs/hypotheses.md`: similarity magnitude doesn't monotonically
-  separate correct from incorrect task matches for this embedding model
-  on terse arithmetic phrasings.
-- **Simulated backend by default** — see `aicache/llm/simulated.py` for
-  exactly what's real vs. synthetic about its numbers. A real-backend
-  validation run is listed as follow-up work in `docs/experiment-log.md`,
-  not claimed to have been done.
+- **Task-identification threshold is a real, narrowed-but-not-eliminated
+  trade-off** — see H6 in `docs/hypotheses.md`: even with a strong
+  embedding model, correct- and incorrect-match similarity ranges
+  overlap slightly, and the calibrated threshold (0.52) sits inside
+  that overlap by design.
+- **External baselines are environment-dependent** — GPTCache/RedisVL
+  results require a specific local venv layout and, for RedisVL, a
+  reachable Redis instance; both are skipped gracefully (not faked) when
+  absent. See `docs/evaluation.md`.
+- **Simulated LLM backend by default** — see `aicache/llm/simulated.py`
+  for exactly what's real vs. synthetic about its numbers. A real
+  Gemini backend is wired and ready (`aicache/llm/gemini.py`); a
+  real-backend validation run is tracked in `docs/experiment-log.md`.
 - **No eviction/admission policy of any kind** — see
   `docs/eviction-future-work.md`; explicitly deferred, not solved.
 
 ## Prior art
 
-`docs/prior-art.md` — Redis/LangCache, GPTCache, vLLM prefix caching,
+`docs/prior-art.md` — Redis LangCache, **RedisVL and GPTCache (both
+directly benchmarked, not just described)**, vLLM prefix caching,
 LMCache, Agentic Plan Caching, Google PARROT, TinyLFU/W-TinyLFU,
 CacheLib, and others, mapped against this repo's own design choices.
 Nothing in this repo claims to invent computation caching, semantic
@@ -155,21 +184,22 @@ caching, or cost-aware eviction.
 ## Future work
 
 See `docs/eviction-future-work.md` (admission/eviction at real scale)
-and the "Next experiments" list at the end of `docs/experiment-log.md`
-(workload-repetition sweep, identification-threshold sweep, real-backend
-validation, Level 3 prototype, hierarchical/combined baseline).
+and the "Next experiments" notes in `docs/experiment-log.md`
+(workload-repetition sweep, real-backend validation, Level 3 prototype,
+hierarchical/combined baseline).
 
 ## Repository layout
 
 ```
 ai-computation-cache/
-├── docs/            problem, prior-art, architecture, hypotheses,
-│                    evaluation, eviction-future-work, experiment-log
-├── src/aicache/     the library: cache/, semantic/matching/, computation/,
-│                    binding/, validation/, metrics/, llm/
-├── workloads/       Level 1/2 workload generator + paraphrase templates
-├── benchmarks/      baselines.py, run_experiment.py, plots.py
-├── tests/           48 unit + integration tests
-├── results/         results.csv, summary.json, generated charts
-└── configs/         (reserved for future experiment configs)
+├── docs/                problem, prior-art, architecture, hypotheses,
+│                        evaluation, eviction-future-work, experiment-log
+├── src/aicache/         the library: cache/, matching/, computation/,
+│                        binding/, validation/, metrics/, llm/
+├── workloads/           Level 1/2 workload generator + paraphrase templates
+├── benchmarks/          baselines.py, run_experiment.py, plots.py,
+│                        external/ (real GPTCache + RedisVL adapters)
+├── tests/                51 unit + integration tests
+├── results/             results.csv, summary.json, generated charts
+└── configs/             (reserved for future experiment configs)
 ```

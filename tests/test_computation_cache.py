@@ -4,23 +4,17 @@ from aicache.cache.computation import ComputationCache
 from aicache.matching.task_identification import TaskIdentifier
 
 
-def _cache(embedder, threshold=0.3):
-    # NOTE: 0.3, not the harness's default 0.6. Empirically, this
-    # embedding model (all-MiniLM-L6-v2) assigns surprisingly low
-    # absolute cosine similarity to short arithmetic phrasings even
-    # against their own canonical examples (~0.3-0.5) — see
-    # docs/experiment-log.md. These tests use a threshold that matches
-    # that reality so they test the *mechanism* (fresh recomputation per
-    # hit); the harness's own default threshold, and the real tension
-    # between admitting genuine matches vs. rejecting near-miss
-    # confusions (e.g. subtract mistaken for add), is a separate,
-    # documented finding — not something to paper over here.
+def _cache(embedder, threshold=0.52):
+    # 0.52 matches TaskIdentifier's own calibrated default (see that
+    # module) for redis/langcache-embed-v1 — zero misidentified matches
+    # observed at this threshold across this project's own 150-request
+    # workload, at ~82% recall of genuinely-correct matches.
     return ComputationCache(identifier=TaskIdentifier(embedder=embedder, threshold=threshold))
 
 
 def test_hit_computes_fresh_correct_answer(embedder):
     cache = _cache(embedder)
-    result = cache.lookup("What is 512 plus 937?")
+    result = cache.lookup("Can you add 512 and 937?")
     assert result.hit
     assert result.task_type == "add"
     assert math.isclose(result.answer, 1449.0)
@@ -32,7 +26,7 @@ def test_hit_recomputes_for_different_parameters_each_time(embedder):
     cached/stale response."""
     cache = _cache(embedder)
     r1 = cache.lookup("What is 10 plus 20?")
-    r2 = cache.lookup("What is 512 plus 937?")
+    r2 = cache.lookup("Can you add 512 and 937?")
     assert r1.hit and r2.hit
     assert r1.task_type == r2.task_type == "add"
     assert math.isclose(r1.answer, 30.0)
