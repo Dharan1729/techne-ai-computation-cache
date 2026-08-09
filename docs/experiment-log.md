@@ -408,3 +408,89 @@ run (see `docs/experiment-log.md`'s next update, or `results/` for
 whether one has landed by the time this is read). Workload-repetition
 sweep (H5) and Level 3 prototype remain unstarted, per EXP-004's
 original list.
+
+---
+
+## EXP-007 — Real-backend (Gemini) spot-check: a correctness-checker bug found, a hard quota wall hit
+
+**Date**: 2026-08-10
+**Goal**: the "real-backend validation" item queued since EXP-004 — confirm
+this repo's correctness-checking and cache-outcome logic behave sensibly
+against real model output, not just the simulated backend's own
+ground-truth-by-construction answers.
+
+**What happened, in order:**
+
+1. A single manual call to `gemini-2.5-flash` succeeded — correct answer,
+   real token counts, ~1.4s latency.
+2. Four more manual calls, using this project's actual (non-instructed)
+   workload phrasings — e.g. "What is 512 plus 937?", no "answer with
+   just the number" hint — all returned **correct final answers wrapped
+   in worked explanations**: `"To find the sum of 512 and 937, we add
+   them:\n\n512\n+ 937\n-----\n1449\n\nSo, 512 plus 937 is **1449**."`
+3. **Bug found**: `aicache/metrics/correctness.py`'s `is_correct` parsed
+   the *first* number in the response text (`parse_first_number`). On
+   response (2) above, that extracts `512` — an input operand — not the
+   answer. Every one of the four real responses would have been graded
+   incorrect despite being correct. This bug was invisible through
+   EXP-001–EXP-006 because the simulated LLM always answers with a
+   single bare number (`"1449"`, no surrounding text), so "first number"
+   and "last number" were always the same value — the bug had zero
+   opportunity to manifest until real model output hit it.
+4. **Fix**: renamed to `parse_final_number`, changed to take the *last*
+   extracted number instead of the first. Re-verified correct against
+   all four real responses (including a compound-interest case with a
+   worked multi-line derivation ending in "**$1469.33**"). Re-ran the
+   full 51-test suite — all pass unchanged, confirming zero behavioral
+   change for the simulated backend (the whole point of picking "last"
+   over "first" as the more robust heuristic, not a simulated-vs-real
+   special case).
+5. Also, while in `aicache/llm/gemini.py`: disabled Gemini's extended
+   "thinking" mode (`thinkingConfig.thinkingBudget: 0`) — pure
+   arithmetic/formula questions get no accuracy benefit from it, and a
+   single throwaway call showed it consuming 312 "thinking" tokens
+   against 10 visible-answer tokens, inflating latency, cost, and
+   rate-limit pressure for nothing. Added client-side request pacing
+   (minimum 4s between requests) and retry-with-backoff for 429/503.
+6. **Attempted a scoped, quota-conscious validation run** (36 requests,
+   then 9 requests, `--skip-threshold-sweep --skip-external`) — both
+   failed with HTTP 429 even with pacing and backoff in place.
+   Diagnosed directly: the error body reports
+   `quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier"`,
+   `quotaValue: "20"` — a **hard daily cap of 20 requests/day** for
+   `gemini-2.5-flash` on this key's project, not a per-minute burst
+   limit pacing could work around. Checked whether other models on the
+   same key had separate headroom (`gemini-2.5-flash-lite` — deprecated/
+   404 for new users; `gemini-2.0-flash`, `gemini-2.0-flash-lite` — both
+   also 429, same daily-exhaustion pattern). Stopped immediately rather
+   than continuing to spend retry attempts against a hard cap that
+   retries cannot fix — each retry is itself a request that counts
+   against the same scarce daily allowance.
+
+**Interpretation**: the real-backend spot-check did exactly the job
+"validation" is supposed to do — it found a real bug
+(first-vs-last-number extraction) that every prior simulated-backend run
+in this repo could never have surfaced, because the simulated backend's
+output shape happened to make the bug's two code paths identical. That's
+the general argument for real-backend validation this project's docs
+made before ever running one: a simulated backend, however carefully
+built, can only be as revealing as its own assumptions about output
+shape — and this project's own simulated LLM's assumption ("answers are
+bare numbers") turned out to be doing more work than intended, quietly
+protecting a bug in the harness itself, not just standing in for model
+quality. The daily-quota wall is a mundane, expected constraint (flagged
+explicitly when the Gemini backend was first built, and again before
+this run) — not a finding about the caching hypotheses, just the reason
+a full real-backend run of EXP-006's scale doesn't exist yet.
+
+**Next**: retry a real-backend validation run once the daily quota
+resets (or with a paid/higher-tier key) — same scoped approach (small
+workload, `--skip-threshold-sweep --skip-external`, now with correct
+answer parsing and request pacing already in place, so the only
+remaining constraint is quota, not code). A single day's 20-request
+allowance is enough for roughly the 9-request configuration attempted
+here (no_cache + exact_cache + a handful of semantic/computation-cache
+misses/fallbacks) but not for anything close to EXP-006's 150-request,
+multi-threshold scale — a full real-backend replication of EXP-006
+would need either a paid tier or accumulating results across several
+days' free quota.

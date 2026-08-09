@@ -10,3 +10,7 @@ venv/
 
 # Model download caches, if ever pointed locally
 .cache/
+
+# Local secrets — never commit
+.env
+.env.*

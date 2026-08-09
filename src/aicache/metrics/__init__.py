@@ -1,5 +1,5 @@
 from .aggregate import BaselineSummary, summarize, summarize_all
-from .correctness import is_correct, parse_first_number
+from .correctness import is_correct, parse_final_number
 from .types import Outcome, RequestResult
 
 __all__ = [
@@ -9,5 +9,5 @@ __all__ = [
     "summarize",
     "summarize_all",
     "is_correct",
-    "parse_first_number",
+    "parse_final_number",
 ]

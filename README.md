@@ -167,8 +167,13 @@ refusal to guess, not a failure. Full numbers and interpretation:
   absent. See `docs/evaluation.md`.
 - **Simulated LLM backend by default** — see `aicache/llm/simulated.py`
   for exactly what's real vs. synthetic about its numbers. A real
-  Gemini backend is wired and ready (`aicache/llm/gemini.py`); a
-  real-backend validation run is tracked in `docs/experiment-log.md`.
+  Gemini backend is wired and working (`aicache/llm/gemini.py`) and a
+  spot-check against it already paid for itself: it caught a real bug
+  in this repo's own correctness checker (it parsed the *first* number
+  in a response, which broke against a real model showing its work —
+  fixed, see `docs/experiment-log.md` EXP-007). A full-scale real-backend
+  replication of EXP-006 hasn't run yet — blocked on a hard 20
+  requests/day free-tier quota, not on anything left to build.
 - **No eviction/admission policy of any kind** — see
   `docs/eviction-future-work.md`; explicitly deferred, not solved.
 
