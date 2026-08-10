@@ -207,3 +207,18 @@ rather than duplicated here; the headline results:
   / validate / fetch / execute) shows fetch time, not identification
   time, dominates a Level 3 hit — the opposite balance from Level 1/2,
   where there was no fetch step at all.
+
+## Addendum: Level 3b (structural locality and state volatility sweeps)
+
+EXP-009/EXP-010 established the Level 3 mechanism at a single workload
+shape and two mutation-exposure endpoints. EXP-011/EXP-012
+(`docs/level3b.md`) swept both variables directly — see that document's
+hypotheses M1-M3 for full statements. Headline: computation-cache hit
+rate and correctness are flat across a 40x range of entity-combination
+diversity, while semantic caching's correctness *falls* as its raw hit
+rate *rises* over that same range (more distinct entities grow the
+false-neighbor pool faster than the true-repeat pool) — a sharper
+version of H7 than the original single-workload comparison could show.
+Correctness under mutation exposure follows `1 − mutation_rate`
+precisely for both semantic caching and the stale-fetch ablation, while
+the always-fresh condition (D) stays flat at 100% at every rate tested.

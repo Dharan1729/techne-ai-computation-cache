@@ -835,4 +835,109 @@ the mechanism exists and behaves as designed when it fires.
 exposure) and a structural-locality sweep (vs. EXP-009's fixed high
 task-type repetition) are both proposed, not attempted, in
 `docs/level3.md`'s "Next: structural locality and state volatility"
-section.
+section. Now done — see EXP-011 and EXP-012.
+
+---
+
+## EXP-011 — Level 3b structural-locality sweep
+
+**Date**: 2026-08-10
+**Hypothesis under test**: M1/M2 (`docs/level3b.md`) — does
+computation-cache hit rate/correctness survive a drop in structural
+locality, and does semantic caching's failure mode change shape as
+entity diversity increases.
+
+**Configuration**: `python -m benchmarks.level3.locality_sweep` — 6
+sweep points (`combinations_per_task` in `[2, 5, 10, 20, 40, 80]`,
+`paraphrases_per_combination` fixed at 3, the max available per task),
+all 5 baselines run at each point via the unchanged
+`benchmarks/level3/baselines.py` runners. `n_transactions`/`n_customers`
+scaled with `combinations_per_task` so larger points aren't starved of
+distinct records. ~6 minutes wall time for the full sweep (2,355 total
+requests across 6 points, replayed through all 5 baselines).
+
+**Observed**: computation cache (D/E) stayed at 96.0–100.0% hit rate, 0%
+invalid, 100% correct across the entire 40x range. `semantic_cache`'s
+hit rate *rose* (76.7% → 91.5%) while its correctness *fell*
+(70.0% → 47.2%) and its invalid-hit rate rose (30.0% → 52.8%) — hit rate
+and correctness moving in opposite directions. `exact_cache`'s hit rate
+crept from 0.0% to 8.4%, fully explained by a real, verified mechanism
+(sampling-with-replacement collisions in entity draws, compounded by
+deterministic template rendering — confirmed by directly counting
+duplicate texts in the generated workload: 101 duplicate occurrences at
+the 80-combinations point, matching the observed 101 exact hits almost
+exactly) — reported rather than dismissed as noise, per this project's
+standard for anomalies (see EXP-008's own unexplained-latency
+precedent, though this one *was* explained).
+
+![Structural locality sweep](../results/level3/locality_sweep.png)
+
+Full table and discussion in `docs/level3b.md`'s "Sweep 1" section.
+
+**Interpretation**: RQ9's flag ("99.1% is a property of this workload's
+locality, not a general constant") is now a measured relationship, not
+an assertion — and the relationship is more interesting than "response
+caching gets worse": semantic caching's specific failure mode (identity
+collision, `docs/level3.md` Experiment A) gets *systematically worse*
+as entity diversity grows, because diversity grows the false-neighbor
+pool faster than the true-repeat pool.
+
+**Next**: none planned. A wider range (500–1000 combinations, closer to
+the originally sketched scale) is mechanical follow-up, not attempted
+here — see `docs/level3b.md`'s Limitations.
+
+---
+
+## EXP-012 — Level 3b state-volatility sweep
+
+**Date**: 2026-08-10
+**Hypothesis under test**: M3 (`docs/level3b.md`) — correctness under
+mutation exposure should follow `1 − mutation_rate` for any mechanism
+with no staleness-detection signal, and stay flat at 100% for one that
+re-fetches unconditionally.
+
+**Configuration**: `python -m benchmarks.level3.volatility_sweep` — 40
+independent, explicitly-constructed `refund_eligibility` probes
+(guaranteed eligible at the "before" request, same construction
+discipline as EXP-010's three scenarios), each mutated
+(`completed` → `refunded`) with probability `p` between its before/after
+request. Swept `p` over `[0, 0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 1.0]`.
+Fresh, isolated cache instances per probe (matching EXP-010's
+methodology, so this measures only the staleness question, not the
+identity-collision failure mode Experiment A already characterizes
+separately). Mutation type held fixed deliberately — EXP-010 already
+established the effect generalizes across type; this sweep isolates
+rate as the sole variable.
+
+**Observed**:
+
+| Mutation rate | Semantic | D (fresh) | E (stale ablation) |
+|---:|---:|---:|---:|
+| 0% | 100.0% | 100.0% | 100.0% |
+| 1% | 100.0% | 100.0% | 100.0% |
+| 5% | 92.5% | 100.0% | 92.5% |
+| 10% | 87.5% | 100.0% | 87.5% |
+| 25% | 77.5% | 100.0% | 77.5% |
+| 50% | 57.5% | 100.0% | 57.5% |
+| 75% | 27.5% | 100.0% | 27.5% |
+| 100% | 0.0% | 100.0% | 0.0% |
+
+![State volatility sweep](../results/level3/volatility_sweep.png)
+
+`semantic_cache` and E trace the identical curve at every point tested,
+matching the predicted `1 − p` line within normal sampling noise (every
+point within 2.5 percentage points of prediction, n=40 per point). D
+was 100% at all 8 points.
+
+**Interpretation**: the two-point comparison EXP-009/EXP-010 could only
+bound ("100% at 0% exposure, 0% at 100% exposure") is now a full,
+predicted-in-advance curve. That `semantic_cache` and E — two
+structurally different mechanisms (full-answer reuse vs. memoized-fetch
+reuse) — land on the *same* curve is itself informative: neither has any
+way to detect that a byte-identical repeat request's underlying data
+changed, so both simply degrade at the rate the world actually changes
+underneath them.
+
+**Next**: none planned for this phase. Combining both sweeps (locality
+x volatility, jointly) is a natural further extension, not attempted
+here.

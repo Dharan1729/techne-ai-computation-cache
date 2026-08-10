@@ -321,6 +321,107 @@ def plot_correctness_latency_tradeoff(summary: dict, freshness_summary: dict | N
     _savefig(fig, "correctness_latency_tradeoff.png")
 
 
+_SWEEP_LABEL = {
+    "exact_cache": "B: Exact cache",
+    "semantic_cache": "C: Semantic cache",
+    "computation_cache_fresh": "D: Computation (fresh)",
+    "computation_cache_stale_ablation": "E: Computation (stale ablation)",
+}
+_SWEEP_COLOR = {
+    "exact_cache": GRAY,
+    "semantic_cache": ORANGE,
+    "computation_cache_fresh": BLUE,
+    "computation_cache_stale_ablation": YELLOW,
+}
+
+
+def _load_locality_sweep() -> list[dict] | None:
+    path = RESULTS_DIR / "locality_sweep.csv"
+    if not path.exists():
+        return None
+    with open(path, newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def _load_volatility_sweep() -> list[dict] | None:
+    path = RESULTS_DIR / "volatility_sweep.csv"
+    if not path.exists():
+        return None
+    with open(path, newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def plot_locality_sweep(rows: list[dict] | None) -> None:
+    """Level 3b: does D/E's near-perfect hit rate survive when structural
+    locality (distinct entity/parameter combinations per task family)
+    drops? Two panels: raw hit rate (left) and overall correctness
+    (right) — deliberately side by side, because this sweep's most
+    interesting finding is that they move in OPPOSITE directions for
+    semantic_cache (see docs/level3b.md)."""
+    if not rows:
+        print("no locality-sweep data found — run benchmarks/level3/locality_sweep.py first")
+        return
+
+    xs = sorted({int(r["combinations_per_task"]) for r in rows})
+    baselines = ["exact_cache", "semantic_cache", "computation_cache_fresh", "computation_cache_stale_ablation"]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5.2))
+    for b in baselines:
+        hit = [float(next(r for r in rows if int(r["combinations_per_task"]) == x and r["baseline"] == b)["hit_rate"]) * 100 for x in xs]
+        correct = [float(next(r for r in rows if int(r["combinations_per_task"]) == x and r["baseline"] == b)["correctness_rate"]) * 100 for x in xs]
+        style = "--" if b == "computation_cache_stale_ablation" else "-"
+        axes[0].plot(xs, hit, marker="o", color=_SWEEP_COLOR[b], linestyle=style, linewidth=2, label=_SWEEP_LABEL[b])
+        axes[1].plot(xs, correct, marker="o", color=_SWEEP_COLOR[b], linestyle=style, linewidth=2, label=_SWEEP_LABEL[b])
+
+    for ax, title in [(axes[0], "Hit rate"), (axes[1], "Overall correctness")]:
+        ax.set_xscale("log")
+        ax.set_xlabel("Distinct entity combinations per task family (log scale)")
+        ax.set_ylabel(f"{title} (%)")
+        ax.set_ylim(-5, 105)
+        ax.yaxis.set_major_formatter(mticker.PercentFormatter())
+        ax.set_title(title)
+    axes[0].legend(frameon=False, fontsize=8)
+    fig.suptitle(
+        "Level 3b — structural locality sweep: computation-cache hit rate stays flat;\n"
+        "semantic-cache hit rate rises while its correctness falls",
+        fontsize=12,
+    )
+    _savefig(fig, "locality_sweep.png", rect=(0, 0, 1, 0.92))
+
+
+def plot_volatility_sweep(rows: list[dict] | None) -> None:
+    """Level 3b: correctness as a function of mutation exposure, filling
+    in the curve between EXP-009's 0%-exposure point and EXP-010's
+    100%-exposure point."""
+    if not rows:
+        print("no volatility-sweep data found — run benchmarks/level3/volatility_sweep.py first")
+        return
+
+    xs = sorted({float(r["mutation_rate"]) for r in rows})
+    baselines = ["semantic_cache", "computation_cache_fresh", "computation_cache_stale_ablation"]
+
+    fig, ax = plt.subplots(figsize=(8, 5.2))
+    for b in baselines:
+        ys = [float(next(r for r in rows if float(r["mutation_rate"]) == x and r["baseline"] == b)["correctness_after"]) * 100 for x in xs]
+        style = "--" if b == "computation_cache_stale_ablation" else "-"
+        ax.plot([x * 100 for x in xs], ys, marker="o", color=_SWEEP_COLOR[b], linestyle=style, linewidth=2, label=_SWEEP_LABEL[b])
+
+    theoretical = [(1 - x) * 100 for x in xs]
+    ax.plot([x * 100 for x in xs], theoretical, color=TEXT_MUTED, linewidth=1, linestyle=":", label="1 - mutation rate (predicted)")
+
+    ax.set_xlabel("Mutation exposure — share of repeat requests whose record changed (%)")
+    ax.set_ylabel("Correctness after the repeat request (%)")
+    ax.set_ylim(-5, 105)
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.xaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.set_title(
+        "Level 3b — state volatility sweep: D stays correct regardless of mutation rate;\n"
+        "semantic caching and the stale ablation degrade together, in lockstep with (1 - rate)"
+    )
+    ax.legend(frameon=False, fontsize=8.5)
+    _savefig(fig, "volatility_sweep.png")
+
+
 def main() -> None:
     summary = _load_summary()
     rows = _load_rows()
@@ -330,6 +431,8 @@ def main() -> None:
     plot_latency(summary)
     plot_latency_breakdown(rows)
     plot_correctness_latency_tradeoff(summary, freshness_summary)
+    plot_locality_sweep(_load_locality_sweep())
+    plot_volatility_sweep(_load_volatility_sweep())
 
 
 if __name__ == "__main__":

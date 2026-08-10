@@ -632,37 +632,25 @@ intermediate artifacts) that this phase's flat
   than Level 1/2's 9 arithmetic operations did — not a claim that 0.45
   is a universal constant.
 
-## Next: structural locality and state volatility (proposed, not implemented)
+## Next: structural locality and state volatility — done in Level 3b
 
-Level 3 has now shown the architecture works when the computation is a
+Level 3 showed the architecture works when the computation is a
 parameterized, deterministic workflow over freshly-fetched state (RQ9's
-boundary). The natural next experiment attacks the two variables this
-phase's workload held fixed rather than jumping straight to Level 4:
+boundary), but this phase's own workload held two variables fixed:
+structural locality (a small, repeated set of entity combinations) and
+state volatility (measured at only two points, 0% and 100% mutation
+exposure). Both are now swept directly, with measured response curves
+rather than a qualitative flag — see **`docs/level3b.md`**.
 
-- **Structural locality** — this phase's 225-request workload was
-  deliberately built for high structural repetition (5 task types, 15
-  entity combinations each). A real system's hit rate depends on how
-  often incoming requests actually share structure. Proposed sweep:
-  hold request volume fixed, vary the number of distinct task types
-  (e.g. 1000 requests over 10 vs. 100 vs. 500 task types) and measure
-  how computation-cache hit rate degrades as structural repetition
-  drops — RQ9 already flags that 99.1% is a property of *this*
-  workload's locality, not a general constant; this would measure the
-  relationship directly instead of asserting it qualitatively.
-- **State volatility** — Experiment B measured correctness at a single,
-  extreme mutation rate (100% of tested queries had their underlying
-  record change between requests). A real system's mutation rate is
-  somewhere between that and Experiment A's 0%. Proposed sweep: vary
-  the fraction of repeat requests whose underlying record was mutated
-  since the last time it was read, and measure how the stale-fetch
-  ablation's correctness degrades between the 100%-correct (0% mutation
-  exposure) and 0%-correct (100% mutation exposure) endpoints this
-  phase already measured — turning the two-point comparison in "The
-  combined, honest three-way view" into an actual curve.
-
-Not started in this phase — recorded here as the specific, targeted
-follow-up this phase's own results motivate, should be validated before
-committing to it rather than treated as already planned.
+Headline results, in brief (full discussion in `docs/level3b.md`):
+computation-cache hit rate and correctness stay flat across a 40x range
+of entity-combination diversity, while semantic caching's correctness
+falls *and its hit rate rises* over the same range (a sharper, more
+counterintuitive version of H7 — more distinct entities means more
+near-duplicate false neighbors, not fewer real matches); and
+correctness under mutation exposure follows `1 − mutation_rate`
+precisely for both semantic caching and the stale-fetch ablation, while
+the always-fresh condition stays flat at 100% regardless of rate.
 
 ## Deferred: Level 4
 
