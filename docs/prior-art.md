@@ -46,3 +46,20 @@ actually measures, is a specific combination at a specific scope:
 Labeled a **potentially differentiated hypothesis** — the combination,
 tested on Level 1/2 arithmetic and business-formula workloads — not a
 novel invention of any of its parts.
+
+## Level 3 addition: the RAG/tool-agent framing
+
+Level 3 (`docs/level3.md`) sits closer to the **Agentic Plan Caching**
+row above than Level 1/2 did — a workflow task's `fetch` step is, in
+effect, a single hard-coded tool call, and every baseline (A-E, not
+just the computation cache) has to perform that call before it can
+produce any plausible answer at all, the same prerequisite a real
+RAG/tool-using agent faces. The differentiator this repo still tests is
+unchanged from the table above: explicit validation of whether a
+rebinding is safe before executing on it, with a documented fallback —
+now demonstrated, in `docs/level3.md`, catching two genuine
+misidentification events on a live-state workload, not only a
+closed-form arithmetic one. Level 3 does not add a new prior-art
+category to this table; it's the same "potentially differentiated
+hypothesis" tested one level further from the closed-form arithmetic
+where the comparison is easiest to control.

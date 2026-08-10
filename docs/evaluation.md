@@ -57,6 +57,36 @@ reader who clones this repo without that exact local setup will see
 than reproduce their rows in `results/results.csv`. This repo's own
 four baselines never depend on either being present, by design.
 
+## Level 3 additions
+
+Level 3 (`docs/level3.md`) reuses this same methodology unchanged —
+`aicache/metrics/aggregate.py::summarize` and the
+outcome/correctness-vs-hit-rate discipline above apply identically —
+with two additions specific to workflow tasks over live state:
+
+- **Per-task correctness checking**
+  (`aicache/metrics/workflow_correctness.py`) replaces the single
+  generic `parse_final_number` comparison with a small, honest parser
+  per task type (booleans compared exactly, dollar amounts via a
+  `$`-prefixed regex with the same ±1e-3 tolerance, risk category via
+  keyword search) — a structured multi-field result isn't reducible to
+  "the last number in the text" the way a plain arithmetic answer is.
+  Tested only against this repo's own renderer
+  (`aicache/llm/workflow_rendering.py`); real-backend validation of this
+  parsing layer specifically (the way EXP-007/008 validated Level 1/2's
+  parser against Gemini and Ollama) is listed as follow-up in
+  `docs/level3.md`'s Limitations, not attempted in this phase.
+- **Per-stage latency decomposition** (`identify_ms` / `extract_ms` /
+  `validate_ms` / `fetch_ms` / `execute_ms`, via
+  `aicache/cache/workflow_computation.py::LatencyBreakdown`) alongside
+  the aggregate p50/p95/p99 figures above — see `docs/level3.md`'s L5
+  and RQ5 for what this decomposition revealed that an aggregate number
+  would have hidden.
+
+The single-run, no-repeated-trials limitation stated above applies to
+Level 3's results identically — see `docs/level3.md`'s own Limitations
+section rather than restating it here.
+
 ## Reproducibility
 
 - Python 3.11.8, macOS (Darwin), CPU only — see

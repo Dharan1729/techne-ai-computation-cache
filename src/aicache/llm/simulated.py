@@ -95,7 +95,13 @@ class SimulatedLLM(LLMClient):
 
         op = task_hint.get("operation")
         params = task_hint.get("params", {})
+        kind = task_hint.get("kind", "arithmetic")
 
+        if kind == "workflow":
+            return self._answer_workflow(op, params)
+        return self._answer_arithmetic(op, params)
+
+    def _answer_arithmetic(self, op: str | None, params: dict) -> str:
         # Single source of truth: the same TASK_REGISTRY executor the
         # computation cache uses to compute its own answers. Duplicating
         # the formulas here would risk the simulated "ground truth" and
@@ -114,3 +120,24 @@ class SimulatedLLM(LLMClient):
             return f"[simulated answer error: {exc}]"
 
         return f"{result:.4f}" if isinstance(result, float) else str(result)
+
+    def _answer_workflow(self, op: str | None, params: dict) -> str:
+        # Same single-source-of-truth principle as the arithmetic path:
+        # the simulated "LLM" computes the correct structured result via
+        # the identical WorkflowTaskSpec.executor a computation-cache hit
+        # would use — the only difference is it then renders that result
+        # as prose (see workflow_rendering.py), the way a real model call
+        # would return text rather than a Python dict.
+        from ..computation.workflow_tasks import WORKFLOW_TASK_REGISTRY
+        from .workflow_rendering import render_workflow_answer
+
+        spec = WORKFLOW_TASK_REGISTRY.get(op) if op else None
+        if spec is None:
+            return f"[simulated workflow answer, op={op}, params={params}]"
+
+        try:
+            result = spec.executor(**params)
+        except (KeyError, ZeroDivisionError, TypeError) as exc:
+            return f"[simulated workflow answer error: {exc}]"
+
+        return render_workflow_answer(op, result)

@@ -674,3 +674,138 @@ Also worth trying: the same run with a prompt that asks the model to
 show its work step-by-step (a cheap, realistic mitigation) to see how
 much of the `no_cache` gap is closable without a computation cache at
 all.
+
+---
+
+## EXP-009 — Level 3 primary comparison: database-backed enterprise workflows
+
+**Date**: 2026-08-10
+**Hypothesis under test**: L1-L5 (`docs/level3.md`) — does the "cache
+the plan, not the data" principle established at Level 1/2 generalize
+to workflows that must read live, multi-table enterprise state before
+answering, and does semantic response caching's false-hit problem get
+worse at higher stakes.
+
+**Configuration**: `python -m benchmarks.level3.run_experiment`
+(defaults: `--backend simulated --seed 99 --db-seed 42 --n-customers 80
+--n-transactions 200 --combinations-per-task 15
+--paraphrases-per-combination 3 --semantic-threshold 0.65`) — 225
+requests across 5 task families (`refund_eligibility`,
+`loyalty_discount`, `shipping_cost`, `customer_spend_summary`,
+`transaction_risk`), each of the 5 baselines run against its own
+`db.clone()` of an identical starting database. New machinery this run
+depends on, all built and tested in this phase: `aicache/enterprise/db.py`
+(mutable live database), `aicache/computation/workflow_tasks.py` (5
+task specs), `aicache/binding/entity_extractor.py` (per-slot regex
+extraction), `aicache/cache/workflow_computation.py` (the D/E pipeline
+with 5-stage latency decomposition), `benchmarks/level3/baselines.py`
+and `run_experiment.py`.
+
+**Observed**:
+
+| Baseline | Hit% | Valid% | Invalid% | Fallback% | Correct% | Tokens | Cost (USD) | p50 (ms) |
+|---|---|---|---|---|---|---|---|---|
+| A — No cache | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 7,504 | 0.02398 | 231.5 |
+| B — Exact cache | 3.6% | 3.6% | 0.0% | 0.0% | 100.0% | 7,220 | 0.02302 | 228.1 |
+| C — Semantic cache (0.65) | 84.0% | 48.4% | 35.6% | 0.0% | 64.4% | 1,210 | 0.00387 | 11.0 |
+| D — Computation cache (fresh) | 99.1% | 99.1% | 0.0% | 0.9% | 100.0% | 77 | 0.00025 | 37.4 |
+| E — Stale-fetch ablation | 99.1% | 99.1% | 0.0%* | 0.9% | 100.0%* | 77 | 0.00025 | 12.1 |
+
+\*Identical to D in this run only, because this workload doesn't mutate
+the database mid-run by design — see EXP-010.
+
+![Hit rate by baseline](../results/level3/hit_rate_by_baseline.png)
+![Latency breakdown, D vs E](../results/level3/latency_breakdown_d_vs_e.png)
+
+Full discussion, including the two genuine `loyalty_discount` →
+`refund_eligibility` misidentifications the validation gate caught, and
+why semantic caching's invalid-hit rate (35.6%) is dramatically worse
+here than the tuned Level 1/2 figure (0.7%, `docs/hypotheses.md` H2), is
+in `docs/level3.md`'s Results section rather than duplicated here.
+
+**A bug found and fixed before this run's numbers could be trusted**:
+`aicache/enterprise/db.py`'s fetch methods originally returned live
+references into the stored tables, not copies — meaning the E ablation
+wasn't actually stale (a later mutation would silently change data E
+had already "cached"). Caught by a targeted smoke test before any
+experiment used the fix. See `docs/level3.md`'s "Bugs found and fixed"
+for this and two other bugs (a workload-realism distribution issue, a
+renderer/parser field-ordering mismatch) found and fixed during this
+phase.
+
+**Interpretation**: the four qualitative findings from Level 1/2
+(computation caching's 0% invalid-hit rate, semantic caching's
+real-but-tunable false-hit problem, hit rate's unreliability as a
+standalone correctness proxy, validation-as-hard-gate catching real
+misidentifications) all reproduce at Level 3, on a structurally
+different workload family with live external state — not a given in
+advance, since Level 3 exercises code paths (fetch, entity extraction,
+multi-field structured output) Level 1/2 never touched at all.
+
+**Next**: EXP-010, the dedicated database-mutation experiment — this
+run alone cannot show the freshness benefit the whole phase exists to
+test, only that D and E behave identically absent a mutation.
+
+---
+
+## EXP-010 — Level 3 freshness experiment: request, mutate, repeat
+
+**Date**: 2026-08-10
+**Hypothesis under test**: L2 (`docs/level3.md`) — computation caching's
+"always re-fetch" design should produce a correct, updated answer after
+a database mutation; both semantic response caching and a memoized-fetch
+ablation should not, since neither has any mechanism to notice the
+underlying data changed.
+
+**Configuration**: `python -m benchmarks.level3.freshness_experiment` —
+three hand-picked, independently-inspectable scenarios (not a
+statistical sample; see `docs/level3.md`'s "Freshness model" for why
+this experiment is deliberately small), each following the same
+protocol: issue a request, mutate the database, issue the identical
+request again, compare `semantic_cache`, D (fresh), and E (stale
+ablation) against independently-recomputed ground truth at both points
+in time.
+
+**A bug in this experiment's own script, found and fixed before its
+results could be trusted**: the first run built the simulated LLM's
+`task_hint` from the ground-truth *result* dict (e.g. `eligible=True`)
+instead of the raw *fetched* data the task executor actually takes as
+keyword arguments (e.g. `transaction={...}, policy={...}`), so every
+`semantic_cache` call errored (`_execute_refund_eligibility() got an
+unexpected keyword argument 'eligible'`) rather than producing a real
+answer. Fixed by fetching and executing as two separate steps and
+passing the fetched fields, not the executor's own output, into the
+hint. A bug in this phase's measurement tooling, not in any module
+under test.
+
+**Observed** (`results/level3/freshness_experiment.json` has the full
+record):
+
+| Scenario | Mutation | `semantic_cache` after | D (fresh) after | E (stale ablation) after |
+|---|---|---|---|---|
+| `refund_eligibility_after_status_change` | txn `completed` → `refunded` | "Yes... $500.00" — wrong | "No... (transaction_not_completed)" — correct | "Yes... $500.00" — wrong |
+| `loyalty_discount_after_tier_upgrade` | tier `bronze` → `gold` | "0% discount... $400.00" — wrong | "10% discount... $360.00" — correct | "0% discount... $400.00" — wrong |
+| `refund_eligibility_after_policy_change` | gold refund window `60` → `30` days | "Yes... $300.00" — wrong | "No... (outside_refund_window)" — correct | "Yes... $300.00" — wrong |
+
+3/3 scenarios: ground truth genuinely changed after the mutation
+(verified independently, not read from any baseline under test); D was
+the only condition whose served answer changed with it. `semantic_cache`
+and E both kept serving the exact pre-mutation text, with no signal to
+the caller that anything was stale.
+
+**Interpretation**: this is the result the entire Level 3 phase was
+built to produce — see `docs/level3.md`'s "Core architectural
+principle" section. EXP-009 alone could not have shown this (its
+workload never mutates mid-run); this experiment's whole design exists
+to isolate exactly the property EXP-009's static workload structurally
+cannot exercise.
+
+**Limitations**: three scenarios, one mutation each, not a statistical
+sample — see `docs/level3.md`'s Limitations section. Doesn't estimate
+*how often* staleness would matter in a real request mix, only that the
+mechanism exists and behaves as designed when it fires.
+
+**Next**: none planned for this phase. A natural follow-up (not
+attempted here) would sweep mutation *frequency* against request rate
+to characterize how the staleness risk scales with how quickly the
+underlying data actually changes relative to traffic volume.

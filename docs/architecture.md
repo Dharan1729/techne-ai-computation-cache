@@ -13,16 +13,21 @@ workload levels of increasing difficulty:
    pricing, transaction lookups feeding a formula)
 4. **Level 4 — agent workflows** (multi-step plans over live state)
 
-**This prototype implements and benchmarks Levels 1 and 2 only.** That's
-a deliberate scope decision, not an oversight: Levels 1/2 are closed-form
-and deterministic, which is what makes "reuse the computation, rebind
-fresh parameters, execute directly — no LLM call needed on a hit" a
-coherent, testable design. Levels 3/4 need a different computation
-representation (a workflow/plan with data-fetch steps and freshness
-requirements, not a pure function) and introduce failure modes (stale
-data, authorization context, tool availability) this prototype's
-validation layer doesn't model. Extending to Level 3/4 is future work,
-not a small parameter change — see the note at the end of this document.
+**This prototype implements and benchmarks Levels 1, 2, and 3.** Level 4
+(parameterized workflow *graphs*, branching execution, multiple
+cache-object types) remains out of scope — see `docs/level3.md`'s
+"Deferred: Level 4" section for why and what it would require. This
+document (Levels 1/2's architecture) is kept as originally written
+below; **Level 3's architecture — the mutable enterprise database, the
+`WorkflowTaskSpec` computation representation, per-slot entity
+extraction, the 5-stage latency-decomposed pipeline, and baselines D/E —
+is documented separately in `docs/level3.md` rather than merged into
+this file**, since Level 3 genuinely needs a different computation
+representation (a fetch-then-execute plan over live state, not a pure
+function of positional numbers) the sections below don't describe.
+`aicache/matching/task_identification.py`'s `TaskIdentifier` is the one
+piece of matching machinery both levels actually share (generalized to
+accept either task registry via a constructor parameter, not forked).
 
 ## The four conditions
 

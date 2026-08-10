@@ -169,3 +169,39 @@ EXP-008's own limitations section: this is one real model, one size, no
 prompt engineering, a single un-repeated run — not a claim that LLMs
 "can't do arithmetic," only a measured, honest instance of a
 well-documented general phenomenon, on this project's own workload.
+
+## Addendum: Level 3 (database-backed enterprise workflows)
+
+H1-H8 above are Level 1/2-specific (pure arithmetic and business
+formulas over static, positional parameters) and are left exactly as
+originally evaluated. Level 3 tests a structurally different claim —
+whether "cache the plan, not the data" survives contact with live,
+mutable external state — with its own hypothesis set (L1-L5), evaluated
+against EXP-009/EXP-010 rather than EXP-006. Full statements, evidence,
+and discussion are in `docs/level3.md`'s "Hypotheses (Level 3)" section
+rather than duplicated here; the headline results:
+
+- **L1/L2 supported**: computation-structure reuse generalizes to
+  multi-table workflow tasks (100% correctness on every hit, 0%
+  invalid), and the freshness benefit specifically requires an actually
+  mutating database to demonstrate — a static workload (EXP-009) shows
+  the primary condition (D) and its stale-fetch ablation (E) as
+  statistically identical; only a workload that mutates mid-run
+  (EXP-010) reveals D correctly reflecting each of 3/3 tested mutations
+  while both `semantic_cache` and E silently keep serving pre-mutation
+  answers.
+- **L3 supported, and sharper than at Level 1/2**: semantic response
+  caching's invalid-hit rate is 35.6% here (vs. 0.7% for Level 1/2's
+  tuned configuration, H2) — enterprise identifiers carry the
+  decision-relevant information but almost none of the semantic weight
+  an embedding model responds to, so "same shape, different customer"
+  requests collide in embedding space far more than "same shape,
+  different number" ones did.
+- **L4 supported**: the validation-as-hard-gate mechanism H6 credited
+  with catching Level 1/2 misidentifications fired on two genuine,
+  unforced misidentification events in the Level 3 run (0.9% of
+  requests) — not just a theoretical backstop.
+- **L5 supported**: per-stage latency decomposition (identify / extract
+  / validate / fetch / execute) shows fetch time, not identification
+  time, dominates a Level 3 hit — the opposite balance from Level 1/2,
+  where there was no fetch step at all.
