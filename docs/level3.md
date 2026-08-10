@@ -283,7 +283,7 @@ this run**):
 > number from this table is quoted, it must be quoted alongside
 > Experiment B's — see the combined view at the end of this section.
 
-![Hit rate by baseline, split by correctness](../results/level3/hit_rate_by_baseline.png)
+![Request outcome by baseline, split by correctness, with D/E's fallback slice called out directly](../results/level3/hit_rate_by_baseline.png)
 ![Tokens and cost by baseline](../results/level3/tokens_and_cost_by_baseline.png)
 ![Latency by baseline](../results/level3/latency_by_baseline.png)
 ![Latency breakdown, D vs E](../results/level3/latency_breakdown_d_vs_e.png)
@@ -470,6 +470,19 @@ documentation practice (`docs/experiment-log.md`).
    combined view (`correctness_latency_tradeoff.png`) that sources E's
    correctness from Experiment B rather than Experiment A. See "The
    combined, honest three-way view" above.
+
+6. **A chart-completeness issue, caught in the same review**: the
+   original `hit_rate_by_baseline.png` only stacked `valid_hit_rate` and
+   `invalid_hit_rate`, silently omitting whatever fraction of a
+   baseline's traffic went to the LLM (a `miss` for A/B/C, a `fallback`
+   for D/E). For D and E this made a real, meaningful 0.9% fallback rate
+   (the two genuine misidentifications the validation gate caught —
+   see Experiment A above) invisible, since the bar topped out at 99.1%
+   and read as a flat 100% at a glance. Fixed by stacking a third
+   "went to the LLM" segment on every bar (so each one sums to exactly
+   100%) and adding a direct leader-line callout on D/E's slice
+   specifically, since 0.9% is real but too thin to read at its true
+   proportion otherwise.
 
 ## Hypotheses (Level 3)
 

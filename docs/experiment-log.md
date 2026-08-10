@@ -717,7 +717,7 @@ this table on its own — it holds only at 0% mutation exposure and is
 not evidence E is a safe strategy; see EXP-010, where the identical
 baseline scores 0/3 under mutation.**
 
-![Hit rate by baseline](../results/level3/hit_rate_by_baseline.png)
+![Request outcome by baseline](../results/level3/hit_rate_by_baseline.png)
 ![Latency breakdown, D vs E](../results/level3/latency_breakdown_d_vs_e.png)
 
 Full discussion, including the two genuine `loyalty_discount` →

@@ -126,24 +126,64 @@ def _savefig(fig, name: str, rect: tuple | None = None) -> None:
     print(f"wrote {out}")
 
 
+FALLBACK_COLOR = TEXT_MUTED
+
+
 def plot_hit_rate_by_baseline(summary: dict) -> None:
+    """Stacks all three outcomes that can happen to a request — valid
+    hit, invalid hit, and "went to the LLM" (a computation-cache
+    fallback for D/E, a cache miss for A/B/C) — so every bar sums to
+    100% and none of a baseline's traffic is silently missing from the
+    chart. Earlier versions of this chart only stacked valid+invalid,
+    which made D's real 0.9% fallback rate (two genuine
+    misidentifications the validation gate caught, not a flaw) invisible
+    and let the bar read as a flat, misleading 100%."""
     xs = [b for b in BASELINE_ORDER if b in summary]
     fig, ax = plt.subplots(figsize=(10.5, 5.0))
     valid = [summary[b]["valid_hit_rate"] * 100 for b in xs]
     invalid = [summary[b]["invalid_hit_rate"] * 100 for b in xs]
+    went_to_llm = [(summary[b]["miss_rate"] + summary[b]["fallback_rate"]) * 100 for b in xs]
 
     ax.bar(xs, valid, color=[BASELINE_COLOR[b] for b in xs], label="Valid hit (answer correct)")
     ax.bar(xs, invalid, bottom=valid, color=RED, alpha=0.85, label="Invalid hit (answer wrong)")
+    bottom_llm = [v + i for v, i in zip(valid, invalid)]
+    ax.bar(
+        xs,
+        went_to_llm,
+        bottom=bottom_llm,
+        color=FALLBACK_COLOR,
+        alpha=0.55,
+        label="Went to the LLM (miss / fallback)",
+    )
     ax.set_xticks(range(len(xs)))
     ax.set_xticklabels([BASELINE_LABEL[b] for b in xs], fontsize=8)
     ax.set_ylabel("Share of requests (%)")
-    ax.set_title("Level 3 (enterprise workflow tasks): cache hit rate, split by correctness")
+    ax.set_title("Level 3 (enterprise workflow tasks): request outcome, split by correctness")
+    ax.set_ylim(0, 118)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
     ax.legend(frameon=False, fontsize=8.5, loc="upper left")
+
+    # D/E's fallback slice is real (two genuine misidentifications the
+    # validation gate caught) but only ~0.9% tall — too thin to read at
+    # its true proportion, so it gets a direct callout rather than being
+    # left to disappear visually the way the pre-fix chart let it.
+    for i, b in enumerate(xs):
+        rate = summary[b]["fallback_rate"] * 100
+        if 0 < rate < 5:
+            n = summary[b]["outcome_counts"].get("fallback", 0)
+            ax.annotate(
+                f"{rate:.1f}% fallback\n({n} requests)",
+                xy=(i, 100),
+                xytext=(i, 110),
+                ha="center",
+                fontsize=8,
+                color=TEXT_MUTED,
+                arrowprops=dict(arrowstyle="-", color=TEXT_MUTED, lw=0.8),
+            )
     fig.text(
         0.01,
         0.01,
-        "E's 100% valid-hit rate holds only because this workload never mutates the database mid-run —\n"
+        "E's 0% invalid-hit rate holds only because this workload never mutates the database mid-run —\n"
         "see the freshness experiment (docs/level3.md) for where E diverges from D once the data changes.",
         fontsize=7.5,
         color=TEXT_MUTED,
