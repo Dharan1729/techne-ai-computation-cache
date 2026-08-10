@@ -712,7 +712,10 @@ and `run_experiment.py`.
 | E — Stale-fetch ablation | 99.1% | 99.1% | 0.0%* | 0.9% | 100.0%* | 77 | 0.00025 | 12.1 |
 
 \*Identical to D in this run only, because this workload doesn't mutate
-the database mid-run by design — see EXP-010.
+the database mid-run by design. **Do not cite E's 100% correctness from
+this table on its own — it holds only at 0% mutation exposure and is
+not evidence E is a safe strategy; see EXP-010, where the identical
+baseline scores 0/3 under mutation.**
 
 ![Hit rate by baseline](../results/level3/hit_rate_by_baseline.png)
 ![Latency breakdown, D vs E](../results/level3/latency_breakdown_d_vs_e.png)
@@ -793,6 +796,28 @@ the only condition whose served answer changed with it. `semantic_cache`
 and E both kept serving the exact pre-mutation text, with no signal to
 the caller that anything was stale.
 
+**Aggregate post-mutation correctness** (added after this experiment's
+first pass, in response to the review below —
+`benchmarks/level3/freshness_experiment.py::_summarize_post_mutation_correctness`,
+written to `freshness_experiment.json`'s `summary` key):
+
+| Baseline | Post-mutation correctness |
+|---|---|
+| `computation_cache_fresh` | 3/3 (100%) |
+| `computation_cache_stale_ablation` | 0/3 (0%) |
+| `semantic_cache` | 0/3 (0%) |
+
+**⚠️ This number and EXP-009's aggregate correctness for
+`computation_cache_stale_ablation` (100%) are NOT the same claim and
+must never be quoted interchangeably** — EXP-009 measures 0% mutation
+exposure, this measures 100% mutation exposure (every scenario mutates
+the queried record). A baseline's correctness here is a function of how
+much mutation exposure it faced, not a fixed property of the baseline.
+An earlier pass of this documentation reported EXP-009's number as if
+it were the whole picture; see `docs/level3.md`'s "Bugs found and
+fixed" item 5 and its combined three-way view
+(`results/level3/correctness_latency_tradeoff.png`) for the fix.
+
 **Interpretation**: this is the result the entire Level 3 phase was
 built to produce — see `docs/level3.md`'s "Core architectural
 principle" section. EXP-009 alone could not have shown this (its
@@ -802,10 +827,12 @@ cannot exercise.
 
 **Limitations**: three scenarios, one mutation each, not a statistical
 sample — see `docs/level3.md`'s Limitations section. Doesn't estimate
-*how often* staleness would matter in a real request mix, only that the
-mechanism exists and behaves as designed when it fires.
+*how often* staleness would matter in a real request mix (100% mutation
+exposure is an extreme, not an estimate of a realistic rate), only that
+the mechanism exists and behaves as designed when it fires.
 
-**Next**: none planned for this phase. A natural follow-up (not
-attempted here) would sweep mutation *frequency* against request rate
-to characterize how the staleness risk scales with how quickly the
-underlying data actually changes relative to traffic volume.
+**Next**: a mutation-*rate* sweep (vs. this experiment's fixed 100%
+exposure) and a structural-locality sweep (vs. EXP-009's fixed high
+task-type repetition) are both proposed, not attempted, in
+`docs/level3.md`'s "Next: structural locality and state volatility"
+section.

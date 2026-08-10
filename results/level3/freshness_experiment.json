@@ -1,197 +1,216 @@
-[
-  {
-    "scenario": "refund_eligibility_after_status_change",
-    "mutation": "transaction status: completed -> refunded",
-    "text": "Is customer CUST-0007 eligible for a refund on transaction TXN-000000?",
-    "before_ground_truth": {
-      "eligible": true,
-      "refund_amount": 500.0,
-      "reason": "within_refund_window"
+{
+  "scenarios": [
+    {
+      "scenario": "refund_eligibility_after_status_change",
+      "mutation": "transaction status: completed -> refunded",
+      "text": "Is customer CUST-0007 eligible for a refund on transaction TXN-000000?",
+      "before_ground_truth": {
+        "eligible": true,
+        "refund_amount": 500.0,
+        "reason": "within_refund_window"
+      },
+      "after_ground_truth": {
+        "eligible": false,
+        "refund_amount": 0.0,
+        "reason": "transaction_not_completed"
+      },
+      "ground_truth_changed": true,
+      "baseline": "semantic_cache",
+      "before_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
+      "after_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
+      "before_correct": true,
+      "after_correct": false
     },
-    "after_ground_truth": {
-      "eligible": false,
-      "refund_amount": 0.0,
-      "reason": "transaction_not_completed"
+    {
+      "scenario": "refund_eligibility_after_status_change",
+      "mutation": "transaction status: completed -> refunded",
+      "text": "Is customer CUST-0007 eligible for a refund on transaction TXN-000000?",
+      "before_ground_truth": {
+        "eligible": true,
+        "refund_amount": 500.0,
+        "reason": "within_refund_window"
+      },
+      "after_ground_truth": {
+        "eligible": false,
+        "refund_amount": 0.0,
+        "reason": "transaction_not_completed"
+      },
+      "ground_truth_changed": true,
+      "baseline": "computation_cache_fresh",
+      "before_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
+      "after_answer": "No, this transaction is not eligible for a refund (transaction_not_completed).",
+      "before_correct": true,
+      "after_correct": true
     },
-    "ground_truth_changed": true,
-    "baseline": "semantic_cache",
-    "before_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
-    "after_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
-    "before_correct": true,
-    "after_correct": false
-  },
-  {
-    "scenario": "refund_eligibility_after_status_change",
-    "mutation": "transaction status: completed -> refunded",
-    "text": "Is customer CUST-0007 eligible for a refund on transaction TXN-000000?",
-    "before_ground_truth": {
-      "eligible": true,
-      "refund_amount": 500.0,
-      "reason": "within_refund_window"
+    {
+      "scenario": "refund_eligibility_after_status_change",
+      "mutation": "transaction status: completed -> refunded",
+      "text": "Is customer CUST-0007 eligible for a refund on transaction TXN-000000?",
+      "before_ground_truth": {
+        "eligible": true,
+        "refund_amount": 500.0,
+        "reason": "within_refund_window"
+      },
+      "after_ground_truth": {
+        "eligible": false,
+        "refund_amount": 0.0,
+        "reason": "transaction_not_completed"
+      },
+      "ground_truth_changed": true,
+      "baseline": "computation_cache_stale_ablation",
+      "before_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
+      "after_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
+      "before_correct": true,
+      "after_correct": false
     },
-    "after_ground_truth": {
-      "eligible": false,
-      "refund_amount": 0.0,
-      "reason": "transaction_not_completed"
+    {
+      "scenario": "loyalty_discount_after_tier_upgrade",
+      "mutation": "customer tier: bronze -> gold",
+      "text": "What discount does customer CUST-0001 get on a $400 order?",
+      "before_ground_truth": {
+        "original_amount": 400.0,
+        "discount_percent": 0.0,
+        "discount_amount": 0.0,
+        "final_amount": 400.0
+      },
+      "after_ground_truth": {
+        "original_amount": 400.0,
+        "discount_percent": 10.0,
+        "discount_amount": 40.0,
+        "final_amount": 360.0
+      },
+      "ground_truth_changed": true,
+      "baseline": "semantic_cache",
+      "before_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
+      "after_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
+      "before_correct": true,
+      "after_correct": false
     },
-    "ground_truth_changed": true,
-    "baseline": "computation_cache_fresh",
-    "before_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
-    "after_answer": "No, this transaction is not eligible for a refund (transaction_not_completed).",
-    "before_correct": true,
-    "after_correct": true
-  },
-  {
-    "scenario": "refund_eligibility_after_status_change",
-    "mutation": "transaction status: completed -> refunded",
-    "text": "Is customer CUST-0007 eligible for a refund on transaction TXN-000000?",
-    "before_ground_truth": {
-      "eligible": true,
-      "refund_amount": 500.0,
-      "reason": "within_refund_window"
+    {
+      "scenario": "loyalty_discount_after_tier_upgrade",
+      "mutation": "customer tier: bronze -> gold",
+      "text": "What discount does customer CUST-0001 get on a $400 order?",
+      "before_ground_truth": {
+        "original_amount": 400.0,
+        "discount_percent": 0.0,
+        "discount_amount": 0.0,
+        "final_amount": 400.0
+      },
+      "after_ground_truth": {
+        "original_amount": 400.0,
+        "discount_percent": 10.0,
+        "discount_amount": 40.0,
+        "final_amount": 360.0
+      },
+      "ground_truth_changed": true,
+      "baseline": "computation_cache_fresh",
+      "before_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
+      "after_answer": "The order total is $400.00, with a 10% discount of $40.00, for a final amount of $360.00.",
+      "before_correct": true,
+      "after_correct": true
     },
-    "after_ground_truth": {
-      "eligible": false,
-      "refund_amount": 0.0,
-      "reason": "transaction_not_completed"
+    {
+      "scenario": "loyalty_discount_after_tier_upgrade",
+      "mutation": "customer tier: bronze -> gold",
+      "text": "What discount does customer CUST-0001 get on a $400 order?",
+      "before_ground_truth": {
+        "original_amount": 400.0,
+        "discount_percent": 0.0,
+        "discount_amount": 0.0,
+        "final_amount": 400.0
+      },
+      "after_ground_truth": {
+        "original_amount": 400.0,
+        "discount_percent": 10.0,
+        "discount_amount": 40.0,
+        "final_amount": 360.0
+      },
+      "ground_truth_changed": true,
+      "baseline": "computation_cache_stale_ablation",
+      "before_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
+      "after_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
+      "before_correct": true,
+      "after_correct": false
     },
-    "ground_truth_changed": true,
-    "baseline": "computation_cache_stale_ablation",
-    "before_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
-    "after_answer": "Yes, this transaction is eligible for a refund of $500.00 (within_refund_window).",
-    "before_correct": true,
-    "after_correct": false
-  },
-  {
-    "scenario": "loyalty_discount_after_tier_upgrade",
-    "mutation": "customer tier: bronze -> gold",
-    "text": "What discount does customer CUST-0001 get on a $400 order?",
-    "before_ground_truth": {
-      "original_amount": 400.0,
-      "discount_percent": 0.0,
-      "discount_amount": 0.0,
-      "final_amount": 400.0
+    {
+      "scenario": "refund_eligibility_after_policy_change",
+      "mutation": "gold tier refund_window_days: 60 -> 30",
+      "text": "Is customer CUST-0001 eligible for a refund on transaction TXN-000001?",
+      "before_ground_truth": {
+        "eligible": true,
+        "refund_amount": 300.0,
+        "reason": "within_refund_window"
+      },
+      "after_ground_truth": {
+        "eligible": false,
+        "refund_amount": 0.0,
+        "reason": "outside_refund_window"
+      },
+      "ground_truth_changed": true,
+      "baseline": "semantic_cache",
+      "before_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
+      "after_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
+      "before_correct": true,
+      "after_correct": false
     },
-    "after_ground_truth": {
-      "original_amount": 400.0,
-      "discount_percent": 10.0,
-      "discount_amount": 40.0,
-      "final_amount": 360.0
+    {
+      "scenario": "refund_eligibility_after_policy_change",
+      "mutation": "gold tier refund_window_days: 60 -> 30",
+      "text": "Is customer CUST-0001 eligible for a refund on transaction TXN-000001?",
+      "before_ground_truth": {
+        "eligible": true,
+        "refund_amount": 300.0,
+        "reason": "within_refund_window"
+      },
+      "after_ground_truth": {
+        "eligible": false,
+        "refund_amount": 0.0,
+        "reason": "outside_refund_window"
+      },
+      "ground_truth_changed": true,
+      "baseline": "computation_cache_fresh",
+      "before_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
+      "after_answer": "No, this transaction is not eligible for a refund (outside_refund_window).",
+      "before_correct": true,
+      "after_correct": true
     },
-    "ground_truth_changed": true,
-    "baseline": "semantic_cache",
-    "before_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
-    "after_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
-    "before_correct": true,
-    "after_correct": false
-  },
-  {
-    "scenario": "loyalty_discount_after_tier_upgrade",
-    "mutation": "customer tier: bronze -> gold",
-    "text": "What discount does customer CUST-0001 get on a $400 order?",
-    "before_ground_truth": {
-      "original_amount": 400.0,
-      "discount_percent": 0.0,
-      "discount_amount": 0.0,
-      "final_amount": 400.0
+    {
+      "scenario": "refund_eligibility_after_policy_change",
+      "mutation": "gold tier refund_window_days: 60 -> 30",
+      "text": "Is customer CUST-0001 eligible for a refund on transaction TXN-000001?",
+      "before_ground_truth": {
+        "eligible": true,
+        "refund_amount": 300.0,
+        "reason": "within_refund_window"
+      },
+      "after_ground_truth": {
+        "eligible": false,
+        "refund_amount": 0.0,
+        "reason": "outside_refund_window"
+      },
+      "ground_truth_changed": true,
+      "baseline": "computation_cache_stale_ablation",
+      "before_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
+      "after_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
+      "before_correct": true,
+      "after_correct": false
+    }
+  ],
+  "summary": {
+    "semantic_cache": {
+      "n_scenarios_with_mutation": 3,
+      "n_correct_after_mutation": 0,
+      "post_mutation_correctness": 0.0
     },
-    "after_ground_truth": {
-      "original_amount": 400.0,
-      "discount_percent": 10.0,
-      "discount_amount": 40.0,
-      "final_amount": 360.0
+    "computation_cache_fresh": {
+      "n_scenarios_with_mutation": 3,
+      "n_correct_after_mutation": 3,
+      "post_mutation_correctness": 1.0
     },
-    "ground_truth_changed": true,
-    "baseline": "computation_cache_fresh",
-    "before_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
-    "after_answer": "The order total is $400.00, with a 10% discount of $40.00, for a final amount of $360.00.",
-    "before_correct": true,
-    "after_correct": true
-  },
-  {
-    "scenario": "loyalty_discount_after_tier_upgrade",
-    "mutation": "customer tier: bronze -> gold",
-    "text": "What discount does customer CUST-0001 get on a $400 order?",
-    "before_ground_truth": {
-      "original_amount": 400.0,
-      "discount_percent": 0.0,
-      "discount_amount": 0.0,
-      "final_amount": 400.0
-    },
-    "after_ground_truth": {
-      "original_amount": 400.0,
-      "discount_percent": 10.0,
-      "discount_amount": 40.0,
-      "final_amount": 360.0
-    },
-    "ground_truth_changed": true,
-    "baseline": "computation_cache_stale_ablation",
-    "before_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
-    "after_answer": "The order total is $400.00, with a 0% discount of $0.00, for a final amount of $400.00.",
-    "before_correct": true,
-    "after_correct": false
-  },
-  {
-    "scenario": "refund_eligibility_after_policy_change",
-    "mutation": "gold tier refund_window_days: 60 -> 30",
-    "text": "Is customer CUST-0001 eligible for a refund on transaction TXN-000001?",
-    "before_ground_truth": {
-      "eligible": true,
-      "refund_amount": 300.0,
-      "reason": "within_refund_window"
-    },
-    "after_ground_truth": {
-      "eligible": false,
-      "refund_amount": 0.0,
-      "reason": "outside_refund_window"
-    },
-    "ground_truth_changed": true,
-    "baseline": "semantic_cache",
-    "before_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
-    "after_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
-    "before_correct": true,
-    "after_correct": false
-  },
-  {
-    "scenario": "refund_eligibility_after_policy_change",
-    "mutation": "gold tier refund_window_days: 60 -> 30",
-    "text": "Is customer CUST-0001 eligible for a refund on transaction TXN-000001?",
-    "before_ground_truth": {
-      "eligible": true,
-      "refund_amount": 300.0,
-      "reason": "within_refund_window"
-    },
-    "after_ground_truth": {
-      "eligible": false,
-      "refund_amount": 0.0,
-      "reason": "outside_refund_window"
-    },
-    "ground_truth_changed": true,
-    "baseline": "computation_cache_fresh",
-    "before_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
-    "after_answer": "No, this transaction is not eligible for a refund (outside_refund_window).",
-    "before_correct": true,
-    "after_correct": true
-  },
-  {
-    "scenario": "refund_eligibility_after_policy_change",
-    "mutation": "gold tier refund_window_days: 60 -> 30",
-    "text": "Is customer CUST-0001 eligible for a refund on transaction TXN-000001?",
-    "before_ground_truth": {
-      "eligible": true,
-      "refund_amount": 300.0,
-      "reason": "within_refund_window"
-    },
-    "after_ground_truth": {
-      "eligible": false,
-      "refund_amount": 0.0,
-      "reason": "outside_refund_window"
-    },
-    "ground_truth_changed": true,
-    "baseline": "computation_cache_stale_ablation",
-    "before_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
-    "after_answer": "Yes, this transaction is eligible for a refund of $300.00 (within_refund_window).",
-    "before_correct": true,
-    "after_correct": false
+    "computation_cache_stale_ablation": {
+      "n_scenarios_with_mutation": 3,
+      "n_correct_after_mutation": 0,
+      "post_mutation_correctness": 0.0
+    }
   }
-]
+}

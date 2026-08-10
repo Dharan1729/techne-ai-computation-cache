@@ -241,13 +241,30 @@ since its whole point is a database that changes mid-run.
 
 ## Results
 
-### Primary comparison
+Reported as **two separate experiments with two separate correctness
+numbers, deliberately not merged into one table.** They answer different
+questions and are not comparable request-for-request: Experiment A
+measures behavior under this workload's normal (zero mid-run mutation)
+traffic; Experiment B measures behavior at the moment a mutation
+actually happens. A baseline's correctness is a function of how much
+mutation exposure it faced during measurement — not a single fixed
+property of the baseline — and reporting only one of the two numbers
+would misrepresent what was actually measured. This split (and the
+warning below) exists because an earlier draft of this document
+presented Experiment A's aggregate table as if it were the whole
+picture, which let the stale-fetch ablation's 100% correctness stand
+unqualified next to the fresh condition's — technically accurate for
+what Experiment A measures, but dangerously easy to misread as "the
+stale ablation is safe."
+
+### Experiment A — general Level 3 workload (no mutation)
 
 `python -m benchmarks.level3.run_experiment` (defaults: seed=99,
 db_seed=42, 80 customers, 200 transactions, 15 entity combinations × 3
 paraphrases per task type → 225 requests across the 5 task families, all
 run against independent `db.clone()` snapshots so every baseline sees
-identical starting state):
+identical starting state, and **the database is never mutated during
+this run**):
 
 | Baseline | Hit% | Valid% | Invalid% | Fallback% | Correct% | Tokens | Cost (USD) | p50 (ms) |
 |---|---|---|---|---|---|---|---|---|
@@ -255,33 +272,37 @@ identical starting state):
 | B — Exact cache | 3.6% | 3.6% | 0.0% | 0.0% | 100.0% | 7,220 | 0.02302 | 228.1 |
 | C — Semantic cache (0.65) | 84.0% | 48.4% | 35.6% | 0.0% | 64.4% | 1,210 | 0.00387 | 11.0 |
 | D — Computation cache (fresh) | 99.1% | 99.1% | 0.0% | 0.9% | 100.0% | 77 | 0.00025 | 37.4 |
-| E — Stale-fetch ablation | 99.1% | 99.1% | 0.0%\* | 0.9% | 100.0%\* | 77 | 0.00025 | 12.1 |
+| E — Stale-fetch ablation | 99.1% | 99.1% | 0.0% | 0.9% | 100.0% | 77 | 0.00025 | 12.1 |
 
-\*E's invalid rate and correctness are identical to D's **in this
-specific run only**, because the primary workload never mutates the
-database mid-run — see "Why D and E are identical here" below and the
-freshness experiment (next section) for where they diverge.
+> **⚠️ Do not cite E's 100% correctness from this table on its own.**
+> It is real, and it is not a bug — but it holds *only* because this
+> workload has 0% mutation exposure between a request and any later
+> reuse of its answer. It is not evidence that the stale-fetch ablation
+> is a safe strategy; Experiment B below measures the same baseline
+> under mutation and finds the opposite (0/3 correct). Whenever E's
+> number from this table is quoted, it must be quoted alongside
+> Experiment B's — see the combined view at the end of this section.
 
 ![Hit rate by baseline, split by correctness](../results/level3/hit_rate_by_baseline.png)
 ![Tokens and cost by baseline](../results/level3/tokens_and_cost_by_baseline.png)
 ![Latency by baseline](../results/level3/latency_by_baseline.png)
 ![Latency breakdown, D vs E](../results/level3/latency_breakdown_d_vs_e.png)
 
-**Why D and E are identical here, and why that's expected, not a wasted
-ablation**: without a mutation, "always re-fetch" and "fetch once, reuse
-forever" return the same value — nothing in the underlying data changed
-between the two reads. The gap between them only appears once the
-database changes mid-experiment, which the primary run deliberately
-doesn't do (that's what the freshness experiment, below, is for). What
-the primary run *does* show, even without any mutation, is a latency
-difference: D's mean fetch time on a hit is 23.17ms, E's is 7.33ms —
-because roughly two-thirds of E's hits reuse a memoized fetch from an
-earlier paraphrase of the same entity combination (0ms fetch), while D
-re-fetches every single time by design. That gap alone — real work
-skipped, zero correctness cost, *in a workload with no mutations* — is
-exactly the temptation memoization exists to offer, and exactly why the
-freshness experiment matters: the same mechanism that buys E its speed
-is what breaks it the moment the underlying data actually changes.
+**Why D and E score identically here, and why that's expected, not a
+wasted ablation**: without a mutation, "always re-fetch" and "fetch
+once, reuse forever" return the same value — nothing in the underlying
+data changed between the two reads. The *correctness* gap between them
+only appears once the database changes mid-experiment, which this run
+deliberately doesn't do (that's what Experiment B is for). What this run
+*does* show, even without any mutation, is a latency difference: D's
+mean fetch time on a hit is 23.17ms, E's is 7.33ms — because roughly
+two-thirds of E's hits reuse a memoized fetch from an earlier paraphrase
+of the same entity combination (0ms fetch), while D re-fetches every
+single time by design. That gap alone — real work skipped, zero
+correctness cost, *in a workload with no mutations* — is exactly the
+temptation memoization exists to offer, and exactly why Experiment B
+matters: the same mechanism that buys E its speed is what breaks it the
+moment the underlying data actually changes.
 
 **The computation cache's two fallbacks are a genuine, useful
 near-miss, not a clean pass.** Both are `loyalty_discount` requests
@@ -311,11 +332,11 @@ describe completely different people's money. Level 1/2 could only ever
 demonstrate this failure mode with plain numbers; Level 3 demonstrates
 it with identity.
 
-### Freshness / state-mutation experiment
+### Experiment B — controlled freshness mutation
 
 `python -m benchmarks.level3.freshness_experiment`
 (`results/level3/freshness_experiment.json` has the full machine-readable
-record):
+record, including the aggregate `summary` block below):
 
 | Scenario | Mutation | semantic_cache after | D (fresh) after | E (stale ablation) after |
 |---|---|---|---|---|
@@ -334,10 +355,52 @@ ablation doing precisely what it's designed to demonstrate), and
 already has an answer cached for, so it hits without ever re-examining
 whether the world changed underneath that answer.
 
+**Aggregate, over the 3 scenarios (100% mutation exposure, by
+construction — every scenario mutates the record between the "before"
+and "after" request):**
+
+| Baseline | Post-mutation correctness |
+|---|---|
+| D — Computation cache (fresh) | 3/3 (100%) |
+| E — Stale-fetch ablation | 0/3 (0%) |
+| C — Semantic cache | 0/3 (0%) |
+
 This is the concrete demonstration of "cache the plan, not the data":
 D's plan (which entities, which fetches, which formula) is exactly as
 reusable after each mutation as before it — what changes is the *data*
 the plan reads, and D never caches that.
+
+### The combined, honest three-way view
+
+Neither experiment alone gives a fair correctness number for every
+condition: Experiment A is fair for D (correct regardless of mutation
+exposure — confirmed directly by Experiment B's 3/3) and fair for C
+(its failure mode is embedding proximity, not staleness, so it doesn't
+depend on mutation exposure the way E does) — but Experiment A's number
+for E is only fair *as a statement about zero-mutation traffic specifically*.
+The chart below combines them correctly: C and D take their correctness
+from Experiment A, E takes its correctness from Experiment B, and all
+three take their latency from Experiment A (latency is a property of
+the mechanism — memoized vs. always-fetch — not of whether a mutation
+happened to occur, so it's fair to report from either experiment; the
+larger sample in Experiment A is the better source).
+
+![Correctness vs. latency, the honest three-way tradeoff](../results/level3/correctness_latency_tradeoff.png)
+
+| Condition | Correctness | Latency (p50) | Correctness source |
+|---|---|---|---|
+| C — Semantic cache | 64.4% | 11.0ms | Experiment A (general) |
+| D — Computation cache (fresh) | 100% | 37.4ms | Experiment A (general) — confirmed by Experiment B (3/3) |
+| E — Computation cache (stale ablation) | **0%** | 12.1ms | Experiment B (post-mutation) — **not** Experiment A's 100% |
+
+Read this way, E is not "as good as D but faster" — it is "as fast as a
+lookup, with correctness that degrades to 0% at the mutation rate this
+experiment tested." Its true correctness for any real deployment
+depends entirely on how often the underlying data changes relative to
+how often it's queried, which Experiment B doesn't estimate (three
+scenarios, each with a mutation on every trial, not a realistic mutation
+*rate*) — see "Next: structural locality and state volatility" below for
+the follow-up this motivates.
 
 ## Bugs found and fixed during this phase
 
@@ -393,6 +456,21 @@ documentation practice (`docs/experiment-log.md`).
    anyone noticed the first run's `semantic_cache` answers were garbage
    text.
 
+5. **A reporting-clarity issue, not a code bug, caught in review of an
+   earlier draft of this document**: that draft presented Experiment A's
+   aggregate table (stale-fetch ablation E at 100% correctness, matching
+   D) as the headline Level 3 result, with Experiment B's contradicting
+   finding (E at 0% correctness post-mutation) written up separately and
+   further down. The two numbers are both correct for what they each
+   measure — but presenting Experiment A's in isolation, without its
+   0%-mutation-exposure qualifier attached, invites exactly the wrong
+   conclusion ("the stale ablation is safe"). Fixed by restructuring
+   Results into explicit Experiment A / Experiment B sections, adding an
+   unmissable warning directly under Experiment A's table, and adding a
+   combined view (`correctness_latency_tradeoff.png`) that sources E's
+   correctness from Experiment B rather than Experiment A. See "The
+   combined, honest three-way view" above.
+
 ## Hypotheses (Level 3)
 
 Evaluated against the primary comparison run (EXP-009) and the
@@ -408,11 +486,17 @@ answer.
 
 ### L2 — A database that never changes cannot demonstrate a freshness benefit; a mutating one can, and does so cleanly.
 
-**Supported.** The primary run alone (static database) shows D and E as
+**Supported, with a reporting caveat that had to be corrected in this
+document.** Experiment A alone (static database) shows D and E as
 statistically identical — informative on its own only about latency,
-not correctness. The dedicated mutation experiment (EXP-010) shows the
-gap the static run cannot: 3/3 mutation scenarios flip D's answer
-correctly and leave both `semantic_cache` and E silently wrong.
+not correctness, and **not sufficient grounds to call E's correctness
+100% in general**, even though that's what its own table reports.
+Experiment B shows the gap Experiment A structurally cannot: at 100%
+mutation exposure (every scenario's underlying record changes between
+the two requests), D is 3/3 (100%) and E is 0/3 (0%) — the same
+baseline name, two very different numbers, because correctness here is
+a function of mutation exposure, not a fixed property of the baseline.
+See "The combined, honest three-way view" in the Results section.
 
 ### L3 — At higher-stakes, identity-bearing workloads, semantic response caching's false-hit rate gets worse, not better, than at Level 1/2.
 
@@ -534,6 +618,38 @@ intermediate artifacts) that this phase's flat
   workload's 5 task types**, which embed further apart from each other
   than Level 1/2's 9 arithmetic operations did — not a claim that 0.45
   is a universal constant.
+
+## Next: structural locality and state volatility (proposed, not implemented)
+
+Level 3 has now shown the architecture works when the computation is a
+parameterized, deterministic workflow over freshly-fetched state (RQ9's
+boundary). The natural next experiment attacks the two variables this
+phase's workload held fixed rather than jumping straight to Level 4:
+
+- **Structural locality** — this phase's 225-request workload was
+  deliberately built for high structural repetition (5 task types, 15
+  entity combinations each). A real system's hit rate depends on how
+  often incoming requests actually share structure. Proposed sweep:
+  hold request volume fixed, vary the number of distinct task types
+  (e.g. 1000 requests over 10 vs. 100 vs. 500 task types) and measure
+  how computation-cache hit rate degrades as structural repetition
+  drops — RQ9 already flags that 99.1% is a property of *this*
+  workload's locality, not a general constant; this would measure the
+  relationship directly instead of asserting it qualitatively.
+- **State volatility** — Experiment B measured correctness at a single,
+  extreme mutation rate (100% of tested queries had their underlying
+  record change between requests). A real system's mutation rate is
+  somewhere between that and Experiment A's 0%. Proposed sweep: vary
+  the fraction of repeat requests whose underlying record was mutated
+  since the last time it was read, and measure how the stale-fetch
+  ablation's correctness degrades between the 100%-correct (0% mutation
+  exposure) and 0%-correct (100% mutation exposure) endpoints this
+  phase already measured — turning the two-point comparison in "The
+  combined, honest three-way view" into an actual curve.
+
+Not started in this phase — recorded here as the specific, targeted
+follow-up this phase's own results motivate, should be validated before
+committing to it rather than treated as already planned.
 
 ## Deferred: Level 4
 

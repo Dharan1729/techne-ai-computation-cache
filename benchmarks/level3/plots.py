@@ -109,9 +109,18 @@ def _load_rows() -> list[dict]:
         return list(csv.DictReader(f))
 
 
-def _savefig(fig, name: str) -> None:
+def _load_freshness_summary() -> dict | None:
+    path = RESULTS_DIR / "freshness_experiment.json"
+    if not path.exists():
+        return None
+    with open(path) as f:
+        data = json.load(f)
+    return data.get("summary")
+
+
+def _savefig(fig, name: str, rect: tuple | None = None) -> None:
     out = RESULTS_DIR / name
-    fig.tight_layout()
+    fig.tight_layout(rect=rect)
     fig.savefig(out, dpi=160)
     plt.close(fig)
     print(f"wrote {out}")
@@ -131,7 +140,17 @@ def plot_hit_rate_by_baseline(summary: dict) -> None:
     ax.set_title("Level 3 (enterprise workflow tasks): cache hit rate, split by correctness")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
     ax.legend(frameon=False, fontsize=8.5, loc="upper left")
-    _savefig(fig, "hit_rate_by_baseline.png")
+    fig.text(
+        0.01,
+        0.01,
+        "E's 100% valid-hit rate holds only because this workload never mutates the database mid-run —\n"
+        "see the freshness experiment (docs/level3.md) for where E diverges from D once the data changes.",
+        fontsize=7.5,
+        color=TEXT_MUTED,
+        ha="left",
+        va="bottom",
+    )
+    _savefig(fig, "hit_rate_by_baseline.png", rect=(0, 0.08, 1, 1))
 
 
 def plot_tokens_and_cost(summary: dict) -> None:
@@ -216,13 +235,61 @@ def plot_latency_breakdown(rows: list[dict]) -> None:
     _savefig(fig, "latency_breakdown_d_vs_e.png")
 
 
+def plot_correctness_latency_tradeoff(summary: dict, freshness_summary: dict | None) -> None:
+    """The three-way tradeoff the primary comparison alone can't show
+    honestly for the stale ablation: E's correctness bar here comes from
+    the freshness experiment's post-mutation results (0/3), NOT from
+    run_experiment.py's aggregate (which reads 100% only because that
+    workload has zero mutation exposure — see the caveat on
+    hit_rate_by_baseline.png). Semantic and fresh both use their
+    aggregate run_experiment.py correctness, which IS a fair general
+    number for them (semantic's failure mode is embedding proximity, not
+    staleness; fresh is correct independent of mutation exposure, and
+    the freshness experiment's own 3/3 confirms that directly)."""
+    if not freshness_summary or "computation_cache_stale_ablation" not in freshness_summary:
+        print("no freshness-experiment summary found — run benchmarks/level3/freshness_experiment.py first")
+        return
+
+    stale_rate = freshness_summary["computation_cache_stale_ablation"]["post_mutation_correctness"]
+    points = [
+        ("semantic_cache", "C: Semantic", summary["semantic_cache"]["correctness_rate"] * 100, summary["semantic_cache"]["p50_latency_ms"]),
+        ("computation_cache_fresh", "D: Computation (fresh)", summary["computation_cache_fresh"]["correctness_rate"] * 100, summary["computation_cache_fresh"]["p50_latency_ms"]),
+        ("computation_cache_stale_ablation", "E: Computation (stale,\nafter mutation)", stale_rate * 100, summary["computation_cache_stale_ablation"]["p50_latency_ms"]),
+    ]
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.8))
+    for key, label, correctness, latency in points:
+        ax.scatter([latency], [correctness], s=220, color=BASELINE_COLOR[key], zorder=3)
+        ax.annotate(
+            label,
+            (latency, correctness),
+            textcoords="offset points",
+            xytext=(0, 14),
+            ha="center",
+            fontsize=9,
+        )
+    ax.set_xlabel("p50 latency (ms)")
+    ax.set_ylabel("Correctness (%)")
+    ax.set_ylim(-5, 108)
+    ax.set_xlim(0, max(p[3] for p in points) * 1.3)
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.set_title(
+        "Correctness vs. latency: the real three-way tradeoff\n"
+        "E's correctness is measured after a mutation, not the static-workload figure",
+        fontsize=11,
+    )
+    _savefig(fig, "correctness_latency_tradeoff.png")
+
+
 def main() -> None:
     summary = _load_summary()
     rows = _load_rows()
+    freshness_summary = _load_freshness_summary()
     plot_hit_rate_by_baseline(summary)
     plot_tokens_and_cost(summary)
     plot_latency(summary)
     plot_latency_breakdown(rows)
+    plot_correctness_latency_tradeoff(summary, freshness_summary)
 
 
 if __name__ == "__main__":

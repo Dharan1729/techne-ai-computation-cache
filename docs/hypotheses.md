@@ -189,7 +189,9 @@ rather than duplicated here; the headline results:
   statistically identical; only a workload that mutates mid-run
   (EXP-010) reveals D correctly reflecting each of 3/3 tested mutations
   while both `semantic_cache` and E silently keep serving pre-mutation
-  answers.
+  answers, i.e. **0/3 (0%) post-mutation correctness for E — do not cite
+  EXP-009's 100% figure for E without this qualifier attached**; see
+  `docs/level3.md`'s "The combined, honest three-way view."
 - **L3 supported, and sharper than at Level 1/2**: semantic response
   caching's invalid-hit rate is 35.6% here (vs. 0.7% for Level 1/2's
   tuned configuration, H2) — enterprise identifiers carry the

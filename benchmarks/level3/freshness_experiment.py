@@ -24,6 +24,7 @@ Each scenario:
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -138,6 +139,41 @@ def _probe(
     return results
 
 
+def _summarize_post_mutation_correctness(results: list[MutationProbeResult]) -> dict[str, dict]:
+    """Aggregate, per baseline, over only the scenarios whose ground
+    truth actually changed — this is the number that must NOT be
+    confused with run_experiment.py's aggregate correctness for the
+    SAME baseline names. The two numbers answer different questions by
+    construction: the primary comparison workload has 0% of its repeat
+    traffic exposed to a mutation between a request and any later reuse
+    of its plan/answer, while every scenario here has a 100% mutation
+    exposure between the "before" and "after" request. A baseline's
+    correctness is a function of how much mutation exposure it faced,
+    not a fixed property of the baseline — reporting only one of these
+    two numbers (especially the 0%-exposure one, where the stale
+    ablation and even semantic caching can look perfect) would
+    misrepresent what was actually measured. See docs/level3.md's
+    "Experiment A vs Experiment B" section.
+    """
+    per_baseline: dict[str, dict[str, int]] = defaultdict(lambda: {"n": 0, "correct": 0})
+    for r in results:
+        if not r.ground_truth_changed:
+            continue
+        stats = per_baseline[r.baseline]
+        stats["n"] += 1
+        stats["correct"] += int(r.after_correct)
+
+    summary = {}
+    for baseline, stats in per_baseline.items():
+        n = stats["n"]
+        summary[baseline] = {
+            "n_scenarios_with_mutation": n,
+            "n_correct_after_mutation": stats["correct"],
+            "post_mutation_correctness": (stats["correct"] / n) if n else None,
+        }
+    return summary
+
+
 def main() -> None:
     db = generate_enterprise_db(seed=42, n_customers=80, n_transactions=200)
     llm = SimulatedLLM(seed=0)
@@ -197,10 +233,12 @@ def main() -> None:
         embedder,
     )
 
+    summary = _summarize_post_mutation_correctness(all_results)
+
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = RESULTS_DIR / "freshness_experiment.json"
     with open(out_path, "w") as f:
-        json.dump([asdict(r) for r in all_results], f, indent=2, default=str)
+        json.dump({"scenarios": [asdict(r) for r in all_results], "summary": summary}, f, indent=2, default=str)
 
     print("=== Freshness / state-mutation experiment ===\n")
     for r in all_results:
@@ -212,7 +250,19 @@ def main() -> None:
         print(f"    after:  {r.after_answer!r}  correct={r.after_correct}")
         print()
 
-    print(f"Wrote {out_path}")
+    print("=== Post-mutation correctness summary (100% mutation exposure, by construction) ===")
+    print(f"{'baseline':<36}{'n':>4}{'correct':>9}{'rate':>8}")
+    for baseline, stats in sorted(summary.items()):
+        rate = stats["post_mutation_correctness"]
+        print(f"{baseline:<36}{stats['n_scenarios_with_mutation']:>4}{stats['n_correct_after_mutation']:>9}{rate*100:>7.1f}%")
+    print(
+        "\nDo not compare these rates directly to run_experiment.py's aggregate "
+        "correctness for the same baseline names — that run has ~0% mutation "
+        "exposure between a request and any reuse of its answer; every scenario "
+        "here has 100% exposure by construction. See docs/level3.md."
+    )
+
+    print(f"\nWrote {out_path}")
 
 
 if __name__ == "__main__":
