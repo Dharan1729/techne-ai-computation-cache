@@ -227,37 +227,86 @@ and the addendum in `docs/hypotheses.md`.
 - **No eviction/admission policy of any kind** — see
   `docs/eviction-future-work.md`; explicitly deferred, not solved.
 
+## Level 3 and 3b: database-backed enterprise workflows
+
+Extends the same "cache the plan, not the data" idea from closed-form
+arithmetic to workflows that must read live, mutable state (customer/
+transaction/policy records) before answering — full write-up:
+`docs/level3.md`. Headline: 99.1% hit rate, **0% invalid hits**, on a
+workload where semantic caching hits 35.6% invalid — and a dedicated
+freshness experiment demonstrating the mechanism directly: a database
+mutation flips the always-fresh condition's answer correctly while
+semantic caching and a deliberate stale-fetch ablation keep silently
+serving the pre-mutation answer.
+
+`docs/level3b.md` sweeps the two variables the primary comparison held
+fixed: structural locality (computation-cache hit rate/correctness stay
+flat across a 40x range of entity diversity; semantic caching's
+correctness falls *while its hit rate rises* over the same range) and
+state volatility (correctness under mutation exposure follows
+`1 − mutation_rate` precisely for both semantic caching and the stale
+ablation).
+
+## Differentiation
+
+`docs/differentiation.md` — is this actually a different idea, and does
+it matter? Evidence at four levels of rigor: this repo's own controlled
+experiments (0% invalid-hit rate at every phase and every workload
+tested), a real bank's production semantic cache (documented false
+positives up to 99% zero-shot, 3.8% best-case after months of
+hardening — see `docs/prior-art.md`'s "Real-world evidence" section), a
+live, reproducible demo against the real `langgraph` library showing
+its production node-caching feature (`CachePolicy`) is architecturally
+equivalent to this repo's stale-fetch ablation, and the closest
+published academic work (Agentic Plan Caching, arXiv:2506.14852; W5H2,
+arXiv:2602.18922) — which validates the core architecture but doesn't
+rigorously measure the freshness question this repo's Level 3/3b phases
+were built to answer. Includes the honest counter-case: what's already
+been published, and where this repo's claims stop.
+
 ## Prior art
 
 `docs/prior-art.md` — Redis LangCache, **RedisVL and GPTCache (both
-directly benchmarked, not just described)**, vLLM prefix caching,
-LMCache, Agentic Plan Caching, Google PARROT, TinyLFU/W-TinyLFU,
-CacheLib, and others, mapped against this repo's own design choices.
-Nothing in this repo claims to invent computation caching, semantic
-caching, or cost-aware eviction.
+directly benchmarked, not just described)**, LangGraph `CachePolicy`
+(directly exercised against the real library), CrewAI, AutoGen, vLLM
+prefix caching, LMCache, **Agentic Plan Caching and W5H2 (real,
+specific papers, not a research-direction placeholder)**, Google
+PARROT, TinyLFU/W-TinyLFU, CacheLib, and a real banking semantic-cache
+production case study, all mapped against this repo's own design
+choices. Nothing in this repo claims to invent computation caching,
+semantic caching, or cost-aware eviction.
 
 ## Future work
 
-See `docs/eviction-future-work.md` (admission/eviction at real scale)
-and the "Next experiments" notes in `docs/experiment-log.md`
-(workload-repetition sweep, real-backend validation, Level 3 prototype,
-hierarchical/combined baseline).
+Level 3 and 3b (above) are done, not future work. What's left: Level 4
+(parameterized workflow *graphs* — branching execution, tool-result
+caching with graduated TTL freshness rather than Level 3's single
+always-fresh class — see `docs/level3.md`'s "Deferred: Level 4"),
+running the real `langgraph` comparison through this repo's full
+benchmark harness (currently a standalone reproducible demo, not yet
+integrated — see `docs/differentiation.md` §3 and §7), and
+`docs/eviction-future-work.md` (admission/eviction at real scale). See
+also the "Next experiments" notes throughout `docs/experiment-log.md`.
 
 ## Repository layout
 
 ```
 ai-computation-cache/
 ├── docs/                problem, prior-art, architecture, hypotheses,
-│                        evaluation, eviction-future-work, experiment-log
+│                        evaluation, eviction-future-work, experiment-log,
+│                        level3, level3b, differentiation
 ├── src/aicache/         the library: cache/, matching/, computation/,
-│                        binding/, validation/, metrics/, llm/
-├── workloads/           Level 1/2 workload generator + paraphrase templates
+│                        binding/, validation/, metrics/, llm/, enterprise/
+├── workloads/           Level 1/2 workload generator + templates;
+│                        workloads/level3/ (enterprise workflow workload)
 ├── benchmarks/          baselines.py, run_experiment.py, plots.py,
 │                        plot_real_backend.py, external/ (real GPTCache +
-│                        RedisVL adapters)
-├── tests/                51 unit + integration tests
+│                        RedisVL adapters), level3/ (baselines,
+│                        freshness/locality/volatility experiments)
+├── tests/                94 unit + integration tests
 ├── results/             results.csv, summary.json, generated charts
 │                        (simulated-backend, EXP-006 headline numbers)
-│   └── real_backend_ollama/  real-model validation, EXP-008
+│   ├── real_backend_ollama/  real-model validation, EXP-008
+│   └── level3/           Level 3/3b results, sweeps, and charts
 └── configs/             (reserved for future experiment configs)
 ```
