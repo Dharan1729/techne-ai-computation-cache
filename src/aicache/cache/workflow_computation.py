@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from typing import Callable
 
 from ..binding.entity_extractor import extract_entities_and_numbers
 from ..enterprise.db import EnterpriseDB
@@ -71,10 +72,26 @@ class WorkflowComputationCache:
         db: EnterpriseDB,
         identifier: TaskIdentifier,
         use_stale_cache: bool = False,
+        render_fn: Callable[[str, dict], str] | None = None,
     ) -> None:
         self.db = db
         self.identifier = identifier
         self.use_stale_cache = use_stale_cache
+        # Injectable so a registry of a different task shape (Level 4's
+        # graph_tasks, aicache/computation/graph_tasks.py) can supply its
+        # own renderer. Defaults to Level 3's renderer via a lazy import
+        # (avoids a hard import-time dependency on it) — this was
+        # previously hardcoded here, which meant any non-Level-3 task
+        # type silently rendered as a raw Python dict repr instead of
+        # text, and a "approved"-substring correctness check against
+        # that repr failed unpredictably rather than erroring loudly.
+        # Caught when Level 4's first real run showed exactly half of
+        # its otherwise-correct hits marked invalid — see docs/level4.md.
+        if render_fn is None:
+            from ..llm.workflow_rendering import render_workflow_answer
+
+            render_fn = render_workflow_answer
+        self._render_fn = render_fn
         # (task_type, sorted entity items) -> fetched values. Only ever
         # written to / read from when use_stale_cache=True — see the
         # class docstring; this dict staying empty is what makes D and E
@@ -160,9 +177,7 @@ class WorkflowComputationCache:
             )
         lat.execute_ms = (time.perf_counter() - t0) * 1000
 
-        from ..llm.workflow_rendering import render_workflow_answer
-
-        served_text = render_workflow_answer(task_type, result)
+        served_text = self._render_fn(task_type, result)
 
         return WorkflowLookupResult(
             hit=True,

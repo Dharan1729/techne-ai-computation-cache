@@ -25,6 +25,13 @@ import time
 from dataclasses import dataclass, field
 
 _SIMULATED_FETCH_MS = 8.0  # per fetch call; a modest, not-hand-wavy LAN DB round-trip
+# Fraud scores model a slower, ML-model-backed tool call (Level 4,
+# docs/level4.md) — deliberately costlier than a plain row read, which is
+# exactly what makes TTL-caching this specific field operationally
+# tempting in a real system (see LangGraph's real CachePolicy(ttl=...),
+# docs/prior-art.md) rather than an obviously bad idea the way caching a
+# transaction's live status would be.
+_SIMULATED_FRAUD_FETCH_MS = 50.0
 
 TIERS = ["bronze", "silver", "gold"]
 
@@ -70,6 +77,7 @@ class EnterpriseDB:
     customers: dict[str, dict] = field(default_factory=dict)
     transactions: dict[str, dict] = field(default_factory=dict)
     policies: dict[str, dict] = field(default_factory=dict)
+    fraud_scores: dict[str, dict] = field(default_factory=dict)
     _mutation_log: list[str] = field(default_factory=list)
 
     # ---------------------------------------------------------- fetches --
@@ -114,6 +122,12 @@ class EnterpriseDB:
         rate = _SHIPPING_ZONE_RATES.get(zone)
         return FetchResult(rate, (time.perf_counter() - t0) * 1000, rate is not None)
 
+    def fetch_fraud_score(self, customer_id: str) -> FetchResult:
+        t0 = time.perf_counter()
+        time.sleep(_SIMULATED_FRAUD_FETCH_MS / 1000)
+        row = self.fraud_scores.get(customer_id)
+        return FetchResult(dict(row) if row else None, (time.perf_counter() - t0) * 1000, row is not None)
+
     # ---------------------------------------------------------- mutations --
     # Every mutation is logged (mutation description) so an experiment
     # replaying a fixed script can report exactly what changed and when —
@@ -144,6 +158,11 @@ class EnterpriseDB:
             self.policies[tier][k] = v
             self._mutation_log.append(f"policy {tier}.{k}: {old} -> {v}")
 
+    def mutate_fraud_score(self, customer_id: str, new_score: float) -> None:
+        old = self.fraud_scores[customer_id]["score"]
+        self.fraud_scores[customer_id]["score"] = new_score
+        self._mutation_log.append(f"fraud_score {customer_id}: {old} -> {new_score}")
+
     # ---------------------------------------------------------- lifecycle --
 
     def clone(self) -> "EnterpriseDB":
@@ -155,6 +174,7 @@ class EnterpriseDB:
             customers=copy.deepcopy(self.customers),
             transactions=copy.deepcopy(self.transactions),
             policies=copy.deepcopy(self.policies),
+            fraud_scores=copy.deepcopy(self.fraud_scores),
             _mutation_log=[],
         )
 
@@ -178,6 +198,23 @@ def generate_enterprise_db(
             "region": rng.choice(["us-east", "us-west", "eu", "apac"]),
             "account_status": "active" if rng.random() > 0.05 else "suspended",
             "signup_day": rng.randint(1, 1000),
+        }
+        # A two-population mixture, not a single tail-heavy distribution:
+        # a beta(2,6) tail (mean ~0.25) alone puts under 1% of scores
+        # above the 0.7 high-risk cutoff (aicache/computation/graph_tasks.py)
+        # — checked numerically before trusting it, the same discipline
+        # that caught Level 3's uniform-day/refund-window mismatch
+        # (docs/level3.md) — which would make the fraud-check branch a
+        # rare accident rather than a reliably exercised code path.
+        # Explicit ~12% high-risk pool guarantees branch coverage instead.
+        if rng.random() < 0.12:
+            score = round(rng.uniform(0.65, 0.95), 4)
+        else:
+            score = round(rng.betavariate(2, 6), 4)
+        db.fraud_scores[customer_id] = {
+            "customer_id": customer_id,
+            "score": score,
+            "computed_day": max(1, 1000 - rng.randint(0, 60)),
         }
 
     customer_ids = list(db.customers.keys())

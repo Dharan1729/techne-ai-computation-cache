@@ -97,6 +97,8 @@ class SimulatedLLM(LLMClient):
         params = task_hint.get("params", {})
         kind = task_hint.get("kind", "arithmetic")
 
+        if kind == "graph":
+            return self._answer_graph(op, params)
         if kind == "workflow":
             return self._answer_workflow(op, params)
         return self._answer_arithmetic(op, params)
@@ -141,3 +143,25 @@ class SimulatedLLM(LLMClient):
             return f"[simulated workflow answer error: {exc}]"
 
         return render_workflow_answer(op, result)
+
+    def _answer_graph(self, op: str | None, params: dict) -> str:
+        # Same single-source-of-truth principle: params here already
+        # includes the fields GRAPH_TASK_REGISTRY's always-fresh fetch
+        # produced (see benchmarks/level4/baselines.py's _ask_llm), so
+        # the simulated "model" is computing from the identical ground
+        # truth a fresh baseline-F hit would use — the LLM is never the
+        # source of correctness for this workload family, only its
+        # renderer.
+        from ..computation.graph_tasks import GRAPH_TASK_REGISTRY
+        from .graph_rendering import render_graph_answer
+
+        spec = GRAPH_TASK_REGISTRY.get(op) if op else None
+        if spec is None:
+            return f"[simulated graph answer, op={op}, params={params}]"
+
+        try:
+            result = spec.executor(**params)
+        except (KeyError, ZeroDivisionError, TypeError) as exc:
+            return f"[simulated graph answer error: {exc}]"
+
+        return render_graph_answer(op, result)

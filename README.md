@@ -247,6 +247,28 @@ state volatility (correctness under mutation exposure follows
 `1 − mutation_rate` precisely for both semantic caching and the stale
 ablation).
 
+## Level 4: branching workflows and graduated freshness
+
+Extends Level 3 to a branching plan (one hand-specified task,
+`return_decision`, four possible outcomes) and a mixed freshness model —
+full write-up: `docs/level4.md`. Zero changes to any shared matching or
+execution infrastructure were needed to support branching; the plan
+lives entirely inside one task's own fetch logic. Headline: 99.4% hit
+rate, **0% invalid hits**, on a workload where semantic caching hits
+60.6% invalid (worse than Level 3's 35.6% — more distinguishable
+outcomes means a collision is more likely to be substantively wrong,
+not just numerically wrong).
+
+The centerpiece: a graduated-freshness (TTL) sweep quantifying, for the
+first time anywhere this project's research found (`docs/differentiation.md`),
+exactly how a TTL-cached sub-fetch's correctness depends on *both* TTL
+length and how fast the underlying data changes — modeled directly on
+LangGraph's real `CachePolicy(ttl=...)` mechanism (confirmed against the
+actual library). Every TTL shorter than the re-query interval scores
+100% regardless of data volatility; every TTL at or beyond it degrades
+sharply and tracks volatility — a step-transition-then-degrade shape
+predicted before running and confirmed by the data.
+
 ## Differentiation
 
 `docs/differentiation.md` — is this actually a different idea, and does
@@ -278,13 +300,13 @@ semantic caching, or cost-aware eviction.
 
 ## Future work
 
-Level 3 and 3b (above) are done, not future work. What's left: Level 4
-(parameterized workflow *graphs* — branching execution, tool-result
-caching with graduated TTL freshness rather than Level 3's single
-always-fresh class — see `docs/level3.md`'s "Deferred: Level 4"),
-running the real `langgraph` comparison through this repo's full
-benchmark harness (currently a standalone reproducible demo, not yet
-integrated — see `docs/differentiation.md` §3 and §7), and
+Levels 1-4 (above) are done, not future work. What's left: general
+agentic graphs (dynamic plan generation, cycles, an LLM choosing which
+branch to take — explicitly out of scope for Level 4, see
+`docs/level4.md`'s closing section), running the real `langgraph`
+library itself through this repo's full benchmark harness (Level 4's
+TTL sweep reimplements its confirmed mechanism rather than driving the
+library directly — see `docs/differentiation.md` §7), and
 `docs/eviction-future-work.md` (admission/eviction at real scale). See
 also the "Next experiments" notes throughout `docs/experiment-log.md`.
 
@@ -294,19 +316,22 @@ also the "Next experiments" notes throughout `docs/experiment-log.md`.
 ai-computation-cache/
 ├── docs/                problem, prior-art, architecture, hypotheses,
 │                        evaluation, eviction-future-work, experiment-log,
-│                        level3, level3b, differentiation
-├── src/aicache/         the library: cache/, matching/, computation/,
+│                        level3, level3b, level4, differentiation
+├── src/aicache/         the library: cache/ (incl. ttl_cache.py),
+│                        matching/, computation/ (incl. graph_tasks.py),
 │                        binding/, validation/, metrics/, llm/, enterprise/
 ├── workloads/           Level 1/2 workload generator + templates;
-│                        workloads/level3/ (enterprise workflow workload)
+│                        level3/ (enterprise workflow), level4/ (branching)
 ├── benchmarks/          baselines.py, run_experiment.py, plots.py,
 │                        plot_real_backend.py, external/ (real GPTCache +
 │                        RedisVL adapters), level3/ (baselines,
-│                        freshness/locality/volatility experiments)
-├── tests/                94 unit + integration tests
+│                        freshness/locality/volatility experiments),
+│                        level4/ (baselines, TTL sweep)
+├── tests/                118 unit + integration tests
 ├── results/             results.csv, summary.json, generated charts
 │                        (simulated-backend, EXP-006 headline numbers)
 │   ├── real_backend_ollama/  real-model validation, EXP-008
-│   └── level3/           Level 3/3b results, sweeps, and charts
+│   ├── level3/           Level 3/3b results, sweeps, and charts
+│   └── level4/           Level 4 results and TTL sweep
 └── configs/             (reserved for future experiment configs)
 ```

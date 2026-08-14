@@ -61,6 +61,35 @@ def test_fresh_cache_reflects_mutation_but_stale_ablation_does_not(embedder):
     assert after_e.latency.fetch_ms == 0.0
 
 
+def test_default_render_fn_is_level3_workflow_rendering(embedder):
+    """Regression test for a real bug found during Level 4 development:
+    the renderer was hardcoded inside lookup() rather than injectable,
+    so any non-Level-3 task type silently rendered as a raw dict repr
+    instead of text (see docs/level4.md). This confirms the default
+    (no render_fn passed) still behaves exactly as Level 3 always has."""
+    db, cust_id, txn_id = _eligible_refund_db()
+    cache = WorkflowComputationCache(db, _identifier(embedder))
+    result = cache.lookup(f"Is customer {cust_id} eligible for a refund on transaction {txn_id}?")
+    assert result.served_text is not None
+    assert result.served_text.startswith("Yes,") or result.served_text.startswith("No,")
+    assert "{" not in result.served_text  # not a raw dict repr
+
+
+def test_custom_render_fn_is_used_when_provided(embedder):
+    db, cust_id, txn_id = _eligible_refund_db()
+    calls = []
+
+    def fake_render(task_type, result):
+        calls.append((task_type, result))
+        return "CUSTOM RENDERED TEXT"
+
+    cache = WorkflowComputationCache(db, _identifier(embedder), render_fn=fake_render)
+    result = cache.lookup(f"Is customer {cust_id} eligible for a refund on transaction {txn_id}?")
+    assert result.served_text == "CUSTOM RENDERED TEXT"
+    assert len(calls) == 1
+    assert calls[0][0] == "refund_eligibility"
+
+
 def test_latency_breakdown_has_all_five_components(embedder):
     db, cust_id, txn_id = _eligible_refund_db()
     cache = WorkflowComputationCache(db, _identifier(embedder))

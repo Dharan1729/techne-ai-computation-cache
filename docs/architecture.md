@@ -13,21 +13,24 @@ workload levels of increasing difficulty:
    pricing, transaction lookups feeding a formula)
 4. **Level 4 — agent workflows** (multi-step plans over live state)
 
-**This prototype implements and benchmarks Levels 1, 2, and 3.** Level 4
-(parameterized workflow *graphs*, branching execution, multiple
-cache-object types) remains out of scope — see `docs/level3.md`'s
-"Deferred: Level 4" section for why and what it would require. This
+**This prototype implements and benchmarks all four levels.** This
 document (Levels 1/2's architecture) is kept as originally written
 below; **Level 3's architecture — the mutable enterprise database, the
 `WorkflowTaskSpec` computation representation, per-slot entity
 extraction, the 5-stage latency-decomposed pipeline, and baselines D/E —
-is documented separately in `docs/level3.md` rather than merged into
-this file**, since Level 3 genuinely needs a different computation
-representation (a fetch-then-execute plan over live state, not a pure
-function of positional numbers) the sections below don't describe.
-`aicache/matching/task_identification.py`'s `TaskIdentifier` is the one
-piece of matching machinery both levels actually share (generalized to
-accept either task registry via a constructor parameter, not forked).
+is documented separately in `docs/level3.md`**, and **Level 4's — a
+single hand-specified branching workflow, the `TTLCache` "graduated
+freshness" primitive, and baselines F/G — in `docs/level4.md`**, rather
+than merged into this file, since each genuinely needs a computation
+representation (a fetch-then-execute plan over live state; a branching
+plan with a mixed always-fresh/TTL-cached fetch) the sections below
+don't describe. `aicache/matching/task_identification.py`'s
+`TaskIdentifier` and `aicache/cache/workflow_computation.py`'s
+`WorkflowComputationCache` are the matching/execution machinery all
+three later levels actually share (generalized via constructor
+parameters — a swappable registry, an injectable renderer — not
+forked); Level 4 adds no new pipeline, only a new task registered
+against the existing one.
 
 ## The four conditions
 

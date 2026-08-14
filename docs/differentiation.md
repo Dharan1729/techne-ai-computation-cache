@@ -227,10 +227,17 @@ practice:
   different embedding models, and different traffic than this repo's
   own — offered as corroboration that the failure mode is real outside
   a synthetic benchmark, not as a head-to-head benchmark result.
-  Similarly, the LangGraph demo is a minimal reproducible script, not
-  yet run through this repo's full benchmark harness the way GPTCache
-  and RedisVL were (`docs/prior-art.md`'s ⭐ rows) — a real next step,
-  not yet done.
+  The LangGraph demo itself was a minimal reproducible script, not run
+  through this repo's full benchmark harness the way GPTCache and
+  RedisVL were (`docs/prior-art.md`'s ⭐ rows) — that gap is now closed
+  differently than originally planned: rather than vendoring the
+  `langgraph` library itself into the harness, its confirmed mechanism
+  (memoize-by-input-hash with a TTL) was reimplemented as
+  `aicache/cache/ttl_cache.py::TTLCache` and driven through a real
+  TTL x volatility sweep (Level 4, `docs/level4.md` EXP-014) — a
+  reimplementation of a verified mechanism, not the library itself, a
+  distinction worth stating plainly rather than letting "we tested
+  against LangGraph" imply more than was actually done.
 - **Single-run, single-seed results throughout** — the same caveat
   `docs/evaluation.md` states for every phase applies here too; nothing
   in this document should be read as a statistically validated

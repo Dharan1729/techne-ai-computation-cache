@@ -941,3 +941,132 @@ underneath them.
 **Next**: none planned for this phase. Combining both sweeps (locality
 x volatility, jointly) is a natural further extension, not attempted
 here.
+
+---
+
+## EXP-013 — Level 4 primary comparison: branching workflow with graduated freshness
+
+**Date**: 2026-08-14
+**Hypothesis under test**: N1/N3 (`docs/level4.md`) — does the
+computation-cache mechanism extend to a branching plan without
+modifying any shared infrastructure, and does semantic caching's
+failure mode get worse (not just occur at the same rate) when there are
+more distinguishable outcomes to collide between.
+
+**Configuration**: `python -m benchmarks.level4.run_experiment`
+(defaults: seed=99, db_seed=42, 15 combinations per branch x 3
+paraphrases → 180 requests, 45 per branch, explicitly balanced by
+construction — see `workloads/level4/generator.py`). New machinery:
+`aicache/enterprise/db.py` (fraud scores), `aicache/cache/ttl_cache.py`
+(the graduated-freshness primitive, modeled directly on LangGraph's
+real `CachePolicy` — see `docs/differentiation.md`),
+`aicache/computation/graph_tasks.py` (the one branching task,
+`return_decision`), `benchmarks/level4/baselines.py` and
+`run_experiment.py`.
+
+**Two real bugs found and fixed before this run's numbers could be
+trusted** — both described in full in `docs/level4.md`'s "Bugs found
+and fixed": (1) `WorkflowComputationCache` hardcoded Level 3's renderer,
+so every Level 4 `hit` silently rendered as a raw dict repr instead of
+text, and a correctness-checker substring match failed unpredictably
+rather than erroring — fixed by making the renderer an injectable
+constructor parameter (`render_fn`), with a regression test confirming
+Level 3's own behavior is unchanged. (2) The workload generator reused
+static `example_phrasings` (no `{0}`/`{1}` placeholders) as if they
+were `.format()` templates, so every generated request rendered
+identical literal text regardless of which entities were drawn — caught
+by checking `len(set(texts))` against the item count immediately after
+generation.
+
+**Observed**:
+
+| Baseline | Hit% | Valid% | Invalid% | Fallback% | Correct% | Tokens | p50 (ms) |
+|---|---|---|---|---|---|---|---|
+| A — No cache | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 6,330 | 268.8 |
+| C — Semantic cache (0.65) | 96.7% | 36.1% | 60.6% | 0.0% | 39.4% | 208 | 10.0 |
+| F — Graph cache (fresh) | 99.4% | 99.4% | 0.0% | 0.6% | 100.0% | 35 | 92.9 |
+| G — TTL ablation (ttl=∞ in this run) | 99.4% | 99.4% | 0.0%* | 0.6% | 100.0%* | 35 | 53.1 |
+
+\*Identical to F in this run only — no mutation occurs mid-run; see
+EXP-014 for where G diverges.
+
+![Request outcome by baseline](../results/level4/outcome_by_baseline.png)
+
+**Interpretation**: N1 supported cleanly — zero changes to
+`TaskIdentifier`, `WorkflowComputationCache`, or `entity_extractor.py`
+were needed to support a branching, conditionally-multi-fetch task; the
+branch lives entirely inside `return_decision`'s own `fetch` closure.
+N3 also supported: semantic caching's invalid-hit rate (60.6%) is
+sharply worse than Level 3's flat-task figure (35.6%,
+`docs/level3.md` EXP-009) on a structurally comparable workload — more
+distinguishable outcomes (4 branches vs. 2) makes a random embedding
+collision more likely to land on a substantively different wrong
+answer, not just a wrong number. The one fallback (similarity 0.445,
+just under threshold) is again a genuine, safely-caught near-miss,
+reproducing Level 3's own validation-gate finding.
+
+**Next**: EXP-014, the TTL sweep — this run alone cannot show the
+graduated-freshness relationship the whole phase exists to quantify,
+only that F and G behave identically absent any fraud-score mutation.
+
+---
+
+## EXP-014 — Level 4 graduated-freshness (TTL) sweep
+
+**Date**: 2026-08-14
+**Hypothesis under test**: N2 (`docs/level4.md`) — stated before
+running: for `ttl_seconds < CHECK_INTERVAL_SECONDS` (600s), the cached
+fraud-score entry has always expired by the second request, so G
+should match F regardless of volatility; for `ttl_seconds >= 600s`, G's
+correctness should degrade with volatility roughly as `1 - volatility`,
+the same shape Level 3b's stale-ablation sweep (EXP-012) found.
+
+**Configuration**: `python -m benchmarks.level4.ttl_sweep` — 8 TTL
+values (0, 60, 300, 500, 600, 700, 900, 1800 seconds) x 6 volatility
+rates (0-100%) x 30 independent, explicitly-constructed probes per
+point (`_build_probe_db`, mirroring Level 3b's freshness-probe
+discipline), each: prime the fraud-score cache entry, mutate low-risk
+-> high-risk with probability = volatility, wait
+`CHECK_INTERVAL_SECONDS`, repeat the identical request, check G's
+correctness against independently-recomputed ground truth. ~48
+sweep points, fresh isolated `TTLCache`/`TaskIdentifier` per probe.
+
+**Observed** (`results/level4/ttl_sweep.csv` has the full record):
+
+| TTL (s) | 0% volatility | 10% | 25% | 50% | 75% | 100% |
+|---|---|---|---|---|---|---|
+| 0 | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
+| 60 | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
+| 300 | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
+| 500 | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
+| **600** | 100.0% | 86.7% | 76.7% | 40.0% | 10.0% | 0.0% |
+| 700 | 100.0% | 93.3% | 53.3% | 40.0% | 26.7% | 0.0% |
+| 900 | 100.0% | 90.0% | 73.3% | 63.3% | 36.7% | 0.0% |
+| 1800 | 100.0% | 83.3% | 76.7% | 40.0% | 23.3% | 0.0% |
+
+![Graduated freshness TTL sweep](../results/level4/ttl_sweep.png)
+
+The prediction held exactly at the qualitative level: every row below
+the 600s check interval is 100% regardless of volatility; every row at
+or above it drops sharply and tracks volatility, with 0%/100%
+volatility landing exactly on 100%/0% at every TTL >= 600s as required
+by construction. The intermediate cells show real single-run sampling
+noise (n=30/point, same limitation as Level 3b's EXP-012) rather than a
+perfectly smooth `1 - volatility` line — reported as observed, not
+smoothed.
+
+**Interpretation**: this is the number the whole Level 4 phase was
+built to produce — see `docs/level4.md`'s motivation section. No
+source found during this project's research (real production framework
+documentation, a real banking case study, or the closest academic
+papers — `docs/differentiation.md`) quantifies this specific
+interaction between TTL length and underlying data volatility; existing
+guidance found was uniformly qualitative ("shorten the TTL for
+time-sensitive data," LangGraph/PyImageSearch material surveyed in
+`docs/differentiation.md` §3).
+
+**Limitations**: single run, `CHECK_INTERVAL_SECONDS=600` is one
+illustrative re-query cadence, not a claim about real traffic patterns
+— see `docs/level4.md`'s Limitations section.
+
+**Next**: none planned for this phase.

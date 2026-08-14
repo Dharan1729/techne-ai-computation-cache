@@ -222,3 +222,22 @@ version of H7 than the original single-workload comparison could show.
 Correctness under mutation exposure follows `1 − mutation_rate`
 precisely for both semantic caching and the stale-fetch ablation, while
 the always-fresh condition (D) stays flat at 100% at every rate tested.
+
+## Addendum: Level 4 (branching workflows, graduated freshness)
+
+EXP-013/EXP-014 (`docs/level4.md`) test whether the mechanism survives
+two things Level 3 never had: a branching plan (one task, four possible
+outcomes, a genuinely conditional second fetch) and a TTL-cacheable
+sub-fetch rather than a binary always-fresh/memoized-forever split. See
+`docs/level4.md`'s hypotheses N1-N3 for full statements. Headline: zero
+changes to any shared matching/execution infrastructure were needed to
+support branching (N1); semantic caching's invalid-hit rate gets worse
+again under branching, not just the same (60.6% vs. Level 3's 35.6% on
+a structurally comparable task, N3) — more distinguishable outcomes
+means a random embedding collision is more likely to land on a
+substantively different wrong answer. The TTL sweep (N2) quantifies,
+for the first time anywhere found in this project's research
+(`docs/differentiation.md`), exactly how a real production caching
+mechanism's (LangGraph `CachePolicy`-equivalent) correctness degrades
+as a function of both TTL length and how fast the underlying data
+actually changes — see `docs/level4.md` for the full curve.
