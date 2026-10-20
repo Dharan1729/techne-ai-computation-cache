@@ -214,3 +214,44 @@ def test_cli_missing_optional_extra_is_a_clean_error(cfg_path, monkeypatch, caps
     p.write_text(_y.safe_dump(cfg))
     assert main(["run", cfg_path, "What is 15% of 240?"]) == 2
     assert "embeddings" in capsys.readouterr().err
+
+
+# ---- serve refuses unsafe exposure -----------------------------------------------
+
+def _serve_cfg(tmp_path, server=None):
+    d = json.loads(json.dumps(CONFIG))
+    d["upstream"] = {"base_url": "http://x/v1"}
+    if server:
+        d["server"] = server
+    p = tmp_path / "s.yaml"
+    p.write_text(yaml.safe_dump(d))
+    return str(p)
+
+
+def test_serve_refuses_a_public_bind_without_client_auth(tmp_path, capsys, monkeypatch):
+    pytest.importorskip("uvicorn")
+    import uvicorn
+    ran = []
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: ran.append(k))
+    cfg = _serve_cfg(tmp_path)
+    assert main(["serve", cfg, "--host", "0.0.0.0", "--embedder", "hashing"]) == 2
+    assert "refusing to listen" in capsys.readouterr().err and ran == []
+    # loopback is fine, with a note
+    assert main(["serve", cfg, "--embedder", "hashing"]) == 0
+    assert ran[0]["host"] == "127.0.0.1" and "authentication is off" in capsys.readouterr().err
+    # explicit opt-out
+    assert main(["serve", cfg, "--host", "0.0.0.0", "--allow-unauthenticated", "--embedder", "hashing"]) == 0
+
+
+def test_serve_public_bind_is_allowed_with_a_key_and_refuses_an_empty_key(tmp_path, capsys, monkeypatch):
+    pytest.importorskip("uvicorn")
+    import uvicorn
+    ran = []
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: ran.append(k))
+    cfg = _serve_cfg(tmp_path, {"api_key_env": "GW_TEST_KEY"})
+    monkeypatch.delenv("GW_TEST_KEY", raising=False)
+    assert main(["serve", cfg, "--host", "0.0.0.0", "--embedder", "hashing"]) == 2   # variable unset
+    assert "empty or unset" in capsys.readouterr().err
+    monkeypatch.setenv("GW_TEST_KEY", "k")
+    assert main(["serve", cfg, "--host", "0.0.0.0", "--embedder", "hashing"]) == 0
+    assert ran[-1]["host"] == "0.0.0.0"

@@ -43,6 +43,7 @@ Every response carries headers:
 
 ## Security
 
+- **Safe by default.** `aicache serve` binds to `127.0.0.1`. Binding to any other address without `server.api_key_env` is refused unless you pass `--allow-unauthenticated`, for example when a private network already restricts access. If `server.api_key_env` names a variable that is empty or unset, it refuses to start, because every request would be rejected.
 - Set `server.api_key_env` whenever the gateway can be reached by anyone other than your own services. Without it, anyone who can reach the port can use your upstream key through the gateway.
 - `/v1/aicache/*` is disabled unless `server.admin_token_env` is set. These endpoints can read decisions and change tool modes.
 - `/healthz` and `/metrics` are open. Restrict `/metrics` at your network edge.
@@ -77,10 +78,13 @@ aicache_route_latency_ms  (histogram: routing decision time, not upstream time)
 
 ```bash
 docker build -t aicache .
-docker run -p 8080:8080 -e GATEWAY_ADMIN=... -v $PWD/aicache.yaml:/config/aicache.yaml:ro aicache
+docker run -p 8080:8080 -e GATEWAY_KEY=... -e GATEWAY_ADMIN=... \
+  -v $PWD/aicache.yaml:/config/aicache.yaml:ro aicache
 ```
 
-The image is about 360 MB, runs as a non-root user and has a health check on `/healthz`. It does not include torch. Use `embedder: {type: openai, ...}` or `hashing` in the config, or build with `--build-arg EXTRAS=serve,embeddings` to include the local model (much larger). To reach an Ollama on the Docker host, use `http://host.docker.internal:11434/v1` as the upstream.
+The container listens on `0.0.0.0` inside Docker, so your config must set `server.api_key_env: GATEWAY_KEY` (as above) or the container refuses to start. Publish the port only on interfaces you intend, for example `-p 127.0.0.1:8080:8080`.
+
+The image is about 370 MB, runs as a non-root user and has a health check on `/healthz`. It does not include torch. Use `embedder: {type: openai, ...}` or `hashing` in the config, or build with `--build-arg EXTRAS=serve,embeddings` to include the local model (much larger). To reach an Ollama on the Docker host, use `http://host.docker.internal:11434/v1` as the upstream.
 
 ## Limits
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -32,7 +33,7 @@ STARTER = """\
 #   aicache run      aicache.yaml "What is 15% of 240?"
 version: 1
 min_similarity: 0.5
-embedder: {type: sentence-transformers}   # or `hashing` for a no-download trial
+embedder: {type: sentence-transformers}   # or `hashing` (no download; then lower min_similarity: run `aicache calibrate`)
 # upstream:                                # needed for `aicache serve`
 #   base_url: http://localhost:11434/v1
 #   model: llama3
@@ -142,6 +143,10 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _is_loopback(host: str) -> bool:
+    return host in ("127.0.0.1", "localhost", "::1")
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -151,6 +156,21 @@ def cmd_serve(args: argparse.Namespace) -> int:
         print(f"serve needs the 'serve' extra: pip install 'ai-computation-cache[serve]' ({exc})", file=sys.stderr)
         return 2
     cfg = load_config(Path(args.config))
+    key_env = cfg.server.api_key_env
+    if key_env and not os.environ.get(key_env):
+        print(f"error: server.api_key_env is '{key_env}' but that environment variable is empty or unset. "
+              "Every request would be rejected. Set it, or remove server.api_key_env.", file=sys.stderr)
+        return 2
+    if not _is_loopback(args.host) and not key_env and not args.allow_unauthenticated:
+        print(f"error: refusing to listen on {args.host} without client authentication: anyone who can reach the port "
+              "could use your upstream credentials through the gateway.\n"
+              "Set server.api_key_env in the config (clients then send it as a bearer token), "
+              "bind to 127.0.0.1, or pass --allow-unauthenticated if the network already restricts access.",
+              file=sys.stderr)
+        return 2
+    if not key_env:
+        print("note: client authentication is off. Fine for local use; set server.api_key_env before exposing this.",
+              file=sys.stderr)
     emb = make_embedder(args.embedder) if args.embedder else None
     app = create_app(cfg, embedder=emb)
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
@@ -196,8 +216,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = with_config("calibrate", "sweep min_similarity on labeled requests", cmd_calibrate)
     p.add_argument("--labeled", required=True)
     p = with_config("serve", "run the OpenAI-compatible gateway", cmd_serve)
-    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--host", default="127.0.0.1", help="default 127.0.0.1 (local only)")
     p.add_argument("--port", type=int, default=8080)
+    p.add_argument("--allow-unauthenticated", action="store_true",
+                   help="allow a non-local host without server.api_key_env (only if the network restricts access)")
     p.add_argument("--log-level", default="info")
     p = sub.add_parser("stats", help="summarise a decision log (telemetry.log_file)")
     p.add_argument("logfile")

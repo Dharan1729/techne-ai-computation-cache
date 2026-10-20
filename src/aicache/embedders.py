@@ -3,12 +3,12 @@
 similarity.
 
 * ``SentenceTransformerEmbedder``: the default, a local model. Needs the
-  ``embeddings`` extra. Best quality of the three.
+  ``embeddings`` extra.
 * ``OpenAICompatibleEmbedder``: any server that speaks ``POST /v1/embeddings``
   (OpenAI, Ollama, vLLM, and others). No local model.
 * ``HashingEmbedder``: no dependencies and no download. Character n-gram
-  hashing, so it only sees spelling overlap, not meaning. Fine for tests,
-  demos and air-gapped trials. Run ``aicache calibrate`` before relying on it.
+  hashing, so it only sees spelling overlap, not meaning. Each embedder needs
+  its own ``min_similarity``: run ``aicache calibrate`` after switching.
 """
 
 from __future__ import annotations

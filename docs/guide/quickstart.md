@@ -8,7 +8,7 @@ You have an LLM app. Some requests are really calculations: a percentage, a pric
 pip install "ai-computation-cache[embeddings,serve]"
 ```
 
-The core package is small. `embeddings` adds the local embedding model, `serve` adds the gateway, `langchain` adds the LangChain helper. No embedding download? Use `embedder: {type: hashing}` for a first trial.
+The core package is small. `embeddings` adds the local embedding model, `serve` adds the gateway, `langchain` adds the LangChain helper. No embedding download? Use `embedder: {type: hashing}` for a first trial, and run `aicache calibrate` to set its `min_similarity`: it needs a lower value than the neural model.
 
 ## 2. Describe one tool
 
@@ -70,6 +70,8 @@ upstream: {base_url: http://localhost:11434/v1, model: llama3}   # any OpenAI-co
 ```bash
 aicache serve aicache.yaml --port 8080
 ```
+
+`aicache serve` listens on `127.0.0.1` by default, so only your own machine can reach it. To listen on another address you must set `server.api_key_env` (see [the gateway](gateway.md)); otherwise it refuses to start.
 
 ```python
 from openai import OpenAI

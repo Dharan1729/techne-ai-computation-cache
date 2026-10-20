@@ -13,6 +13,7 @@ First release of the product layer on top of the research code.
 - Pluggable embedders: local sentence-transformers, any OpenAI-compatible `/embeddings` server, or a dependency-free hashing embedder.
 - LangChain / LangGraph runnable (`aicache.integrations.langchain`).
 - The core install no longer pulls in torch or the plotting stack. Use extras: `embeddings`, `serve`, `langchain`, `research`.
+- `aicache serve` is local-only by default: it refuses a non-loopback bind without `server.api_key_env`, and refuses an empty key variable.
 - Lexical-cue guard for tools that differ only by operation (EXP-016).
 - Reproducible research results: fair-baseline comparison, 10-seed reruns, real-app integration (EXP-015 to EXP-018).
 

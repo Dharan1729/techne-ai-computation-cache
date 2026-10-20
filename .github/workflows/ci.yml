@@ -3,6 +3,10 @@ on:
   push: {branches: [main]}
   pull_request:
 
+# The workflow only reads the repository.
+permissions:
+  contents: read
+
 jobs:
   core-install:
     # The light install must work without torch, fastapi or langchain.
