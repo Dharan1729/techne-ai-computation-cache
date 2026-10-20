@@ -1,8 +1,8 @@
 """Main-process side of the GPTCache comparison baseline.
 
-Requires the dedicated GPTCache venv from the sibling `semantic
-caching/docker-tests/` project (or any venv with `gptcache faiss-cpu
-sentence-transformers` installed) — see that project's README for setup.
+Requires a dedicated virtual environment with `gptcache faiss-cpu
+sentence-transformers` installed. Create it with
+`bash scripts/setup_external_baselines.sh`.
 This is an *optional* baseline: this repo's own four baselines
 (no_cache/exact_cache/semantic_cache/computation_cache) never depend on
 it, and `benchmarks/run_experiment.py` skips it gracefully (with a
@@ -26,9 +26,8 @@ from workloads.types import WorkloadItem
 
 from .protocol import build_export, results_from_runner_output
 
-_DEFAULT_VENVS_ROOT = (
-    Path.home() / "Desktop" / "caching" / "semantic caching" / "docker-tests"
-)
+# Set up with `bash scripts/setup_external_baselines.sh`; override the location with AICC_EXTERNAL_VENVS_ROOT.
+_DEFAULT_VENVS_ROOT = Path(__file__).resolve().parents[2] / ".venvs-external"
 VENVS_ROOT = Path(os.environ.get("AICC_EXTERNAL_VENVS_ROOT", str(_DEFAULT_VENVS_ROOT)))
 PYTHON_BIN = VENVS_ROOT / ".venv-gptcache" / "bin" / "python3"
 RUNNER = Path(__file__).resolve().parent / "runner_gptcache.py"
@@ -40,7 +39,7 @@ class GPTCacheUnavailable(RuntimeError):
 
 def is_available() -> tuple[bool, str]:
     if not PYTHON_BIN.exists():
-        return False, f"no venv python at {PYTHON_BIN}"
+        return False, f"no venv python at {PYTHON_BIN} (run: bash scripts/setup_external_baselines.sh)"
     return True, ""
 
 
@@ -60,8 +59,7 @@ def run_gptcache(
 
         # faiss-cpu and torch each bundle their own OpenMP runtime; both
         # env vars are needed to avoid a hard segfault on macOS (see
-        # runner_gptcache.py's docstring and the sibling docker-tests
-        # project's README for the same requirement there).
+        # runner_gptcache.py's docstring).
         env = {**os.environ, "OMP_NUM_THREADS": "1", "KMP_DUPLICATE_LIB_OK": "TRUE"}
         proc = subprocess.run(
             [str(PYTHON_BIN), str(RUNNER), str(in_path), str(out_path), str(threshold)],

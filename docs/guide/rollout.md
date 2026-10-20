@@ -24,7 +24,7 @@ The `why requests were refused` line tells you where coverage is lost. It is the
 aicache calibrate aicache.yaml --labeled requests.jsonl
 ```
 
-This sweeps `min_similarity` and recommends the highest threshold that has no bad executions and keeps at least 98% of the best coverage. A threshold that is merely "safe" because it refuses everything is never recommended. Set `min_similarity` and run `eval` again.
+This sweeps `min_similarity` and recommends the highest threshold that has no bad executions and keeps at least 98% of the best coverage. A threshold that is merely "safe" because it refuses everything is never recommended. Set `min_similarity` and run `eval` again. Redo this whenever you change the embedder: a threshold chosen for one embedder is wrong for another.
 
 ## 4. Shadow mode on live traffic
 

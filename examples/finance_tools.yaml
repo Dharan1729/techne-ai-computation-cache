@@ -4,7 +4,7 @@
 #   aicache run      examples/finance_tools.yaml "What is 15% of 240?"
 version: 1
 min_similarity: 0.45
-embedder: {type: sentence-transformers}      # use `hashing` for a no-download trial
+embedder: {type: sentence-transformers}      # `hashing` needs no download but min_similarity ~0.1 (run `aicache calibrate`)
 # upstream:                                   # needed only for `aicache serve`
 #   base_url: http://localhost:11434/v1       # any OpenAI-compatible server
 #   model: llama3

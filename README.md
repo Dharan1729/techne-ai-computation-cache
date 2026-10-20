@@ -73,7 +73,7 @@ upstream: {base_url: http://localhost:11434/v1, model: llama3}   # OpenAI, Ollam
 ```
 
 ```bash
-aicache serve aicache.yaml --port 8080
+aicache serve aicache.yaml --port 8080     # listens on 127.0.0.1; set server.api_key_env to expose it
 ```
 
 ```python
@@ -167,7 +167,7 @@ This is not a new technique. Plan caching and structured-intent caching exist: Z
 ```bash
 pip install -e ".[dev]"
 
-bash scripts/reproduce.sh quick       # 231 tests + the wrong-hit guard comparison, about 5 minutes, offline
+bash scripts/reproduce.sh quick       # 233 tests + the wrong-hit guard comparison, about 5 minutes, offline
 bash scripts/reproduce.sh sweep       # repeat-rate sweep and figure 2, about 15 minutes, offline
 bash scripts/reproduce.sh realmodel   # fair-baseline comparison, needs Ollama and llama3
 bash scripts/reproduce.sh realapp     # financial-chat integration, needs Ollama, llama3 and network
@@ -194,10 +194,17 @@ src/aicache/  router.py, config.py, server.py, cli.py, tooling.py, safe_expr.py,
 docs/         guide/ (user guides), experiment-log.md, prior-art.md, research notes
 examples/     finance_tools.yaml, finance_labeled.jsonl, position_size_router.py
 benchmarks/   research and end-to-end benchmarks
-tests/        231 tests
+tests/        233 tests
 results/      committed raw results and figures
 scripts/      reproduce.sh
 ```
+
+## Third-party notes
+
+- **Default embedding model.** `redis/langcache-embed-v1` is downloaded from Hugging Face the first time it is used. It is not bundled. Its model card does not state a license (it is fine-tuned from `Alibaba-NLP/gte-modernbert-base`). Check its terms before commercial use, or choose another embedder (`type: openai`, or another sentence-transformers model).
+- **GPTCache and RedisVL** (both MIT) are used only as optional comparison baselines, installed separately by `scripts/setup_external_baselines.sh`.
+- **wshobson/financial-chat** is used only by the optional `realapp` benchmark. The script clones it at run time. Nothing from it is vendored or modified here. Its repository has no license file, so none of its code is included. This project is not affiliated with it, and the results describe a local 8B model acting as the router, not that app's own model.
+- **Papers** are cited, not reproduced.
 
 ## License
 

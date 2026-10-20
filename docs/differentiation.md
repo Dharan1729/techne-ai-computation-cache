@@ -110,15 +110,13 @@ Partially — and this is the tier where intellectual honesty matters
 most. Two papers found during this research are close enough that they
 change what this repo can claim:
 
-- **[Agentic Plan Caching (arXiv:2506.14852)](https://arxiv.org/pdf/2506.14852)** —
-  caches the plan, re-fetches data on reuse, validates before reuse.
-  This is this repo's core mechanism, independently published. Their
-  reported hit rate (40–60%) is *lower* than this repo's 99.1%
-  (`docs/level3.md` EXP-009) — not a contradiction; consistent with
-  this repo's own locality sweep (`docs/level3b.md` EXP-011) showing
-  hit rate should fall as structural repetition falls, and their
-  benchmark almost certainly has less structural repetition than this
-  repo's deliberately-repetitive one.
+- **[Agentic Plan Caching (Zhang, Wornow, Wan, Olukotun; arXiv:2506.14852)](https://arxiv.org/abs/2506.14852)** —
+  caches reusable plan templates and adapts them to the task at reuse
+  time. This is close to this repo's core mechanism, independently
+  published. Its abstract reports 50.31% lower cost and 27.28% lower
+  latency on average (v2); the body reports a 46% cache hit rate on 100
+  FinanceBench queries. Those are different measurements on different
+  workloads from this repo's hit rates, so they are not compared here.
 - **[W5H2 (arXiv:2602.18922)](https://arxiv.org/html/2602.18922)** —
   independently arrived at a near-identical split to this repo's
   `TaskIdentifier` (coarse, embedding-based) + `entity_extractor.py`
@@ -134,8 +132,9 @@ one class with D via a single constructor flag — `use_stale_cache`,
 `aicache/cache/workflow_computation.py` — so nothing else differs
 between them), and a *quantified* mutation-rate response curve
 (`docs/level3b.md` EXP-012, matching the predicted `1 − rate` line
-within sampling noise at every point). Agentic Plan Caching mentions
-re-fetching qualitatively; W5H2 doesn't address freshness at all. This
+within sampling noise at every point). Agentic Plan Caching does not discuss data freshness (the words
+stale and fresh do not appear in its current version), and W5H2 doesn't
+address it either. This
 is the actual, defensible, narrow claim: **not** "cache the plan" (already
 published), but "here is exactly how much reuse-without-refetch costs
 you, as a function of how fast the world changes underneath it" — measured,
@@ -151,10 +150,10 @@ not asserted.
 | This repo, real GPTCache (EXP-006) | Semantic cache invalid-hit rate | 70.7% |
 | Real bank, zero-shot (InfoQ case study) | Semantic cache false-positive rate | up to 99% |
 | Real bank, best achieved after hardening | Semantic cache false-positive rate | 3.8% |
-| W5H2 paper, MASSIVE benchmark | GPTCache accuracy vs. structured-key accuracy | 37.9% vs. 91.1% |
-| W5H2 paper, NyayaBench v2 | GPTCache accuracy vs. structured-key accuracy | 49.1% vs. 55.3% |
+| W5H2 paper, MASSIVE benchmark | GPTCache (cosine threshold) accuracy vs. the paper's method | 37.9% vs. 91.1% |
+| W5H2 paper, NyayaBench v2 | GPTCache-KMeans accuracy vs. the paper's method | 49.1% vs. 55.3% |
 | This repo, all phases, computation cache | Invalid-hit rate | **0.0%, every point tested** |
-| Agentic Plan Caching paper | Hit rate / cost reduction | 40–60% hit / up to 60% cost reduction |
+| Agentic Plan Caching paper (v2 abstract) | Cost / latency reduction | 50.31% / 27.28% on average |
 | This repo, Level 3 primary (EXP-009) | Hit rate / token reduction | 99.1% hit / 99.0% token reduction |
 | This repo, Level 3b volatility sweep (EXP-012) | Stale-ablation correctness vs. mutation rate | matches `1 − rate` within noise, every point |
 

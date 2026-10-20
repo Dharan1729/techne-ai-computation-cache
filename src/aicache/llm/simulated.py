@@ -8,8 +8,7 @@ to isolate "the representation problem" from "the LLM-extraction problem"
 before wiring up a real model.
 
 What's real: the token-count heuristic (chars // 4, the same rough
-approximation used elsewhere in caching literature and in this author's
-other projects) and the per-token cost table (`pricing.py`, sourced from
+approximation widely used for quick token estimates) and the per-token cost table (`pricing.py`, sourced from
 published Claude API pricing). What's synthetic: the latency distribution
 (a lognormal shaped to resemble typical small-prompt API latency, not a
 measurement) and — for anything outside the deterministic workload
@@ -37,7 +36,7 @@ _LATENCY_SIGMA = 0.45
 
 
 def _heuristic_token_count(text: str) -> int:
-    """chars // 4, the same rough heuristic Kairos's budgeting.py uses.
+    """chars // 4, a common rough token estimate.
 
     Not a real tokenizer. Good enough for relative comparisons across
     baselines in this controlled benchmark; explicitly not a claim of

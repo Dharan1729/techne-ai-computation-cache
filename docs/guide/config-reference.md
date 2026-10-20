@@ -30,9 +30,11 @@ tools: [...]
 
 | `type` | Notes |
 |---|---|
-| `sentence-transformers` (default) | Local model. `model` defaults to `redis/langcache-embed-v1`. Needs the `embeddings` extra. Best quality. |
+| `sentence-transformers` (default) | Local model. `model` defaults to `redis/langcache-embed-v1`, whose model card states no license: check its terms before commercial use, or set `model` to another sentence-transformers model. Needs the `embeddings` extra. |
 | `openai` | Any server with `POST /v1/embeddings`. Needs `base_url` and `model`; `api_key_env` names the environment variable holding the key. |
-| `hashing` | No dependencies, no download. Matches spelling, not meaning. Fine for trials and tests. Calibrate before relying on it. |
+| `hashing` | No dependencies, no download, about 0.1 ms per request. Matches spelling, not meaning. See the note below on thresholds. |
+
+**Each embedder needs its own `min_similarity`.** On our 131-request finance set, `aicache calibrate` found both safe: `hashing` at a threshold of 0.1 computed 91 of 96 computable requests with no wrong answers and no false triggers, and the neural model at 0.45 computed 90 of 96 with none. Used at the neural model's threshold (0.45), `hashing` computed only 31 of 96. A looser embedder leans more on the slot check, so measure on your own requests. We did not test paraphrases looser than these templates, more tools, or more varied unrelated requests, where the neural model may matter more.
 
 ## `upstream`
 

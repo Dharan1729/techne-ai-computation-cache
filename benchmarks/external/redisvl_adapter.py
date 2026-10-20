@@ -1,8 +1,7 @@
 """Main-process side of the RedisVL comparison baseline.
 
-Requires (a) the dedicated RedisVL venv from the sibling `semantic
-caching/docker-tests/` project (or any venv with `redisvl
-sentence-transformers` installed) and (b) a reachable Redis instance
+Requires (a) a dedicated virtual environment with `redisvl
+sentence-transformers` installed (`bash scripts/setup_external_baselines.sh`) and (b) a reachable Redis instance
 with the search module at redis://localhost:6379 (e.g. `docker run -d
 --name redis-stack -p 6379:6379 -p 8001:8001 redis/redis-stack:latest`).
 Optional baseline — see gptcache_adapter.py's docstring for why this
@@ -26,9 +25,8 @@ from workloads.types import WorkloadItem
 
 from .protocol import build_export, results_from_runner_output
 
-_DEFAULT_VENVS_ROOT = (
-    Path.home() / "Desktop" / "caching" / "semantic caching" / "docker-tests"
-)
+# Set up with `bash scripts/setup_external_baselines.sh`; override the location with AICC_EXTERNAL_VENVS_ROOT.
+_DEFAULT_VENVS_ROOT = Path(__file__).resolve().parents[2] / ".venvs-external"
 VENVS_ROOT = Path(os.environ.get("AICC_EXTERNAL_VENVS_ROOT", str(_DEFAULT_VENVS_ROOT)))
 PYTHON_BIN = VENVS_ROOT / ".venv-redisvl" / "bin" / "python3"
 RUNNER = Path(__file__).resolve().parent / "runner_redisvl.py"
@@ -43,7 +41,7 @@ class RedisVLUnavailable(RuntimeError):
 
 def is_available() -> tuple[bool, str]:
     if not PYTHON_BIN.exists():
-        return False, f"no venv python at {PYTHON_BIN}"
+        return False, f"no venv python at {PYTHON_BIN} (run: bash scripts/setup_external_baselines.sh)"
     try:
         with socket.create_connection((REDIS_HOST, REDIS_PORT), timeout=1.0):
             pass

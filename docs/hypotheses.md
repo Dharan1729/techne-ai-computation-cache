@@ -139,8 +139,8 @@ repo's own semantic-cache implementation isn't a strawman built to lose
 to the computation cache (it matches a real, widely-used system almost
 exactly), and it isolates *embedding model choice* as a variable that
 matters as much as — on this workload, more than — the caching algorithm
-itself, a finding this project's own earlier research (the sibling
-`semantic caching/docker-tests` spike) had already flagged qualitatively
+itself, a finding this project's own earlier research (an earlier, separate spike
+that is not part of this repository) had already flagged qualitatively
 and this run now confirms quantitatively, on a different workload, with
 a controlled sweep.
 

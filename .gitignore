@@ -17,3 +17,6 @@ venv/
 
 # Output of scripts/reproduce.sh
 out/
+
+# Isolated environments for the optional GPTCache / RedisVL baselines
+.venvs-external/

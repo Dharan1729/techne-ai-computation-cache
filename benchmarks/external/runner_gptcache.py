@@ -1,6 +1,4 @@
-"""Runs INSIDE the dedicated GPTCache venv (see ../../README's setup
-notes and the sibling `semantic caching/docker-tests/` project this was
-adapted from) — must not import anything from this repo's own `aicache`
+"""Runs INSIDE the dedicated GPTCache venv (see scripts/setup_external_baselines.sh) — must not import anything from this repo's own `aicache`
 package, since the whole point of running as a subprocess is to keep
 GPTCache's dependency tree (torch, onnxruntime, faiss-cpu) isolated from
 this project's environment.
@@ -16,8 +14,7 @@ GPTCache's own default embedding here (SBERT `all-MiniLM-L6-v2`) is
 deliberately left as GPTCache's own out-of-the-box default rather than
 forced to match this repo's own `redis/langcache-embed-v1` choice — the
 point of this comparison is partly to show how much the embedding model
-choice itself matters (see docs/prior-art.md and the sibling project's
-RESULTS.md, which first surfaced this), not just the caching algorithm.
+choice itself matters (see docs/prior-art.md), not just the caching algorithm.
 """
 
 from __future__ import annotations

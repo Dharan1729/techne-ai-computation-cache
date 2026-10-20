@@ -242,9 +242,7 @@ correctness): 0.80 → 59.3% / 25.3% / 74.7%; 0.85 → 44.7% / 19.3% / 80.7%;
    experiment against a real Gemini backend (`--backend gemini`, see
    `aicache/llm/gemini.py`) to confirm the simulated backend's
    qualitative findings hold with a real model in the loop. Not run in
-   this pass because it requires the user to provision and fund a
-   `GEMINI_API_KEY`, a decision explicitly left to them (see repo
-   history / README).
+   this pass because it needs a paid or quota-limited `GEMINI_API_KEY`.
 4. **Level 3 (DB-backed) prototype** — the natural next scope expansion,
    requiring a different computation representation (see
    `docs/architecture.md`'s scope note) rather than a parameter change
@@ -258,13 +256,7 @@ correctness): 0.80 → 59.3% / 25.3% / 74.7%; 0.85 → 44.7% / 19.3% / 80.7%;
 ## EXP-005 — Embedding model switch: `all-MiniLM-L6-v2` → `redis/langcache-embed-v1`
 
 **Date**: 2026-08-10
-**Motivation**: user request, prompted by two things surfacing together —
-(a) discovering a working local copy of `redis/langcache-embed-v1` was
-already validated in this environment (the sibling `semantic
-caching/docker-tests` project's own `RESULTS.md` flagged it as "a model
-Redis trained specifically for semantic caching," and had already solved
-the setup friction for it), and (b) a direct side-by-side check before
-committing to the switch.
+**Motivation**: two things together: (a) an earlier, separate spike (not part of this repository) had found a working local copy of `redis/langcache-embed-v1` easy to set up and described it as "a model Redis trained specifically for semantic caching", and (b) a direct side-by-side check before committing to the switch.
 
 **Calibration check**: cosine similarity for a genuine paraphrase pair
 ("What is 10 plus 20?" / "Calculate the sum of 10 and 20.") —
@@ -332,8 +324,7 @@ real semantic-caching systems, and separately, how much embedding-model
 choice (as opposed to caching-algorithm implementation) explains the
 semantic cache's correctness behavior.
 
-**Setup**: reused the sibling `semantic caching/docker-tests` project's
-already-solved environments — a dedicated `.venv-gptcache` (GPTCache
+**Setup**: two dedicated virtual environments (see `scripts/setup_external_baselines.sh`) — a `.venv-gptcache` (GPTCache
 0.1.44, local FAISS+SQLite, generic `all-MiniLM-L6-v2` embedding — its
 own out-of-the-box default, deliberately left unchanged, not forced to
 match this repo's embedding choice) and `.venv-redisvl` (RedisVL 0.25.1
@@ -391,8 +382,8 @@ threshold is pushed well past 0.90.
   cutoff) diverge by up to ~70 percentage points of correctness at the
   identical nominal threshold, purely because of which embedding model
   each defaults to. This corroborates — with a controlled sweep, on a
-  different workload — the qualitative finding the sibling
-  `docker-tests` project's `RESULTS.md` first flagged.
+  different workload — the qualitative finding an earlier, separate spike (not part of this
+  repository) had flagged.
 - **This sharpens, rather than undercuts, the case for computation
   caching.** A good embedding model can make semantic response caching
   *safe in practice* at the right threshold — but "safe in practice, at
@@ -407,10 +398,8 @@ threshold is pushed well past 0.90.
   it.
 
 **Next experiments**: real-backend validation (Gemini) remains the
-top item — see EXP-004's list, item 3, now updated to note a
-`GEMINI_API_KEY` was provided by the user; results pending a dedicated
-run (see `docs/experiment-log.md`'s next update, or `results/` for
-whether one has landed by the time this is read). Workload-repetition
+top item — see EXP-004's list, item 3, now updated: a Gemini key was
+later used, but its free tier allowed only a small sample (see EXP-007). Workload-repetition
 sweep (H5) and Level 3 prototype remain unstarted, per EXP-004's
 original list.
 
@@ -507,8 +496,7 @@ days' free quota.
 **Date**: 2026-08-10
 **Motivation**: EXP-007 established the harness works correctly against a
 real model but couldn't run at scale — blocked on Gemini's free-tier
-daily cap. Ollama, run fully locally (this environment: a MacBook with
-an Apple M4 Pro, 16-core CPU / 20-core GPU), has no such ceiling. Added
+daily cap. Ollama, run fully locally (a local Apple Silicon laptop), has no such ceiling. Added
 `aicache/llm/ollama.py` (same `LLMClient` interface as the Gemini
 backend; local REST to `http://localhost:11434/api/generate`, no auth,
 real token counts reported by Ollama itself rather than a heuristic).
@@ -1252,5 +1240,7 @@ The +224 ms is what the gateway adds to a request it cannot answer: embedding th
 - The labeled set is built from the finance benchmark's phrasing templates. The example config's slots were written after seeing failures on the development templates, so coverage on these phrasings is optimistic. The 6 misses are mostly the holdout templates.
 - Expected values come from the same formulas the tools use, so this checks routing and binding, not whether the formulas are right.
 - One run, no repeats. 0 bad executions in 131 requests gives a 95% upper bound of about 3%.
+
+**Embedder comparison** (same labeled set, `aicache eval` and `aicache calibrate`, no model behind it): the neural embedder at 0.45 computed 90 of 96 correctly at about 11 ms per request, with 0 wrong and 0 false triggers. The dependency-free hashing embedder at the neural model's 0.45 computed only 31 of 96, but at its own calibrated threshold (0.1) computed 87 to 91 of 96 (91 at 0.0, 87 at 0.2) with 0 wrong and 0 false triggers, at about 0.1 ms. On this set the slot check, not the embedding, does the rejecting, so the lighter embedder was enough once calibrated. Not tested: looser paraphrases, more tools, more varied unrelated requests.
 
 **Also checked**: the same config with the dependency-free hashing embedder was run in the Docker image (non-root, 357 MB, no torch): computed locally, forwarded to the host's Ollama, enforced the admin token, and reported stats. The core `pip install` is 77 MB against about 1.2 GB with the embedding model.
