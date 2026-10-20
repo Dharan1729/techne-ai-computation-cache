@@ -1,0 +1,1203 @@
+{
+  "summary": {
+    "model": "llama3",
+    "requests": 131,
+    "positives": 96,
+    "negatives": 35,
+    "computed_by_gateway": 90,
+    "computed_correctly": 90,
+    "computed_on_negatives": 0,
+    "positives_forwarded_to_llm": 6,
+    "direct_llm_positives_correct": 7,
+    "direct_llm_note": "NOT a fair baseline: no tool use and replies truncated at max_tokens=200, so the last number is often not the final answer. See EXP-015 for the fair baseline.",
+    "latency_ms": {
+      "gateway_computed_p50": 88.0696875974536,
+      "gateway_forwarded_p50": 4361.762749962509,
+      "direct_p50": 4195.586625020951,
+      "gateway_all_mean": 1359.3523390520052,
+      "direct_all_mean": 3949.362276399238,
+      "forwarded_overhead_median_paired": 224.0232084877789
+    }
+  },
+  "rows": [
+    {
+      "text": "Calculate the 5R profit target for AMD, entry $418.24, stop $398.51",
+      "expect": 516.89,
+      "source": "computation",
+      "gw_ms": 24.388708174228668,
+      "direct_ms": 3005.43058430776,
+      "gw_ok": true,
+      "direct_ok": true
+    },
+    {
+      "text": "Calculate the 3R profit target for AMD, entry $253.61, stop $233.44",
+      "expect": 314.12,
+      "source": "computation",
+      "gw_ms": 48.17670816555619,
+      "direct_ms": 4251.620875205845,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Calculate the 3R profit target for NFLX, entry $238.85, stop $220.62",
+      "expect": 293.54,
+      "source": "computation",
+      "gw_ms": 188.31750005483627,
+      "direct_ms": 4205.22337500006,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Calculate the 2R profit target for TSLA, entry $225.43, stop $195.45",
+      "expect": 285.39,
+      "source": "computation",
+      "gw_ms": 58.400374837219715,
+      "direct_ms": 4248.861417174339,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I'm buying SHOP at $471.81 with a stop at $455.66. Where is my 3R target?",
+      "expect": 520.26,
+      "source": "computation",
+      "gw_ms": 157.10104070603848,
+      "direct_ms": 4428.136957809329,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I'm buying SHOP at $26.9 with a stop at $24.57. Where is my 2R target?",
+      "expect": 31.56,
+      "source": "computation",
+      "gw_ms": 213.7875002808869,
+      "direct_ms": 3867.3888752236962,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I'm buying AAPL at $107.5 with a stop at $94.5. Where is my 2R target?",
+      "expect": 133.5,
+      "source": "computation",
+      "gw_ms": 249.1749171167612,
+      "direct_ms": 3150.1597920432687,
+      "gw_ok": true,
+      "direct_ok": true
+    },
+    {
+      "text": "I'm buying AMD at $170.09 with a stop at $156.64. Where is my 3R target?",
+      "expect": 210.44,
+      "source": "computation",
+      "gw_ms": 331.21395809575915,
+      "direct_ms": 3210.2834577672184,
+      "gw_ok": true,
+      "direct_ok": true
+    },
+    {
+      "text": "What are the R multiple targets for NFLX if I enter at 127.48 and my stop loss is 112.86? Use a 2R multiple.",
+      "expect": 156.72,
+      "source": "computation",
+      "gw_ms": 98.01166597753763,
+      "direct_ms": 3803.2782920636237,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "What are the R multiple targets for TSLA if I enter at 230.37 and my stop loss is 203.5? Use a 2R multiple.",
+      "expect": 284.11,
+      "source": "computation",
+      "gw_ms": 162.77033323422074,
+      "direct_ms": 4409.077082760632,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "What are the R multiple targets for AMZN if I enter at 165.03 and my stop loss is 144.82? Use a 4R multiple.",
+      "expect": 245.87,
+      "source": "computation",
+      "gw_ms": 157.90074970573187,
+      "direct_ms": 4195.586625020951,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "What are the R multiple targets for AAPL if I enter at 52.3 and my stop loss is 49.26? Use a 5R multiple.",
+      "expect": 67.5,
+      "source": "computation",
+      "gw_ms": 148.97020813077688,
+      "direct_ms": 4198.783291969448,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "How many shares of TSLA should I buy with a $75000 account risking 1.5% per trade? Entry $314.13, stop $304.45.",
+      "expect": 116.22,
+      "source": "computation",
+      "gw_ms": 163.66579197347164,
+      "direct_ms": 4318.52720817551,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "How many shares of GOOGL should I buy with a $75000 account risking 2% per trade? Entry $449.76, stop $419.76.",
+      "expect": 50.0,
+      "source": "computation",
+      "gw_ms": 248.32229083403945,
+      "direct_ms": 4199.168124701828,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "How many shares of AMD should I buy with a $500000 account risking 3% per trade? Entry $405.65, stop $348.88.",
+      "expect": 264.22,
+      "source": "computation",
+      "gw_ms": 79.51795775443316,
+      "direct_ms": 4031.409707851708,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "How many shares of AAPL should I buy with a $10000 account risking 1% per trade? Entry $162.71, stop $140.02.",
+      "expect": 4.41,
+      "source": "computation",
+      "gw_ms": 108.7354589253664,
+      "direct_ms": 4214.581999927759,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Position size for TSLA: account $75000, risk 1.5%, entry 248.74, stop 229.77.",
+      "expect": 59.3,
+      "source": "computation",
+      "gw_ms": 75.86720818653703,
+      "direct_ms": 3490.934417117387,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Position size for AAPL: account $100000, risk 1%, entry 189.26, stop 164.12.",
+      "expect": 39.78,
+      "source": "computation",
+      "gw_ms": 87.49629138037562,
+      "direct_ms": 4034.118749666959,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Position size for NFLX: account $250000, risk 2%, entry 98.02, stop 93.97.",
+      "expect": 1234.57,
+      "source": "computation",
+      "gw_ms": 63.90391616150737,
+      "direct_ms": 3983.537333086133,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Position size for AMD: account $250000, risk 1.5%, entry 430.19, stop 382.54.",
+      "expect": 78.7,
+      "source": "computation",
+      "gw_ms": 74.24900028854609,
+      "direct_ms": 3508.273582905531,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I have $500000 and want to risk 1% on MSFT. I'd enter at $311.72 with a stop at $295.03, what size?",
+      "expect": 299.58,
+      "source": "computation",
+      "gw_ms": 197.0074586570263,
+      "direct_ms": 4222.701833117753,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I have $50000 and want to risk 1% on MSFT. I'd enter at $196.83 with a stop at $181.08, what size?",
+      "expect": 31.75,
+      "source": "computation",
+      "gw_ms": 101.9235416315496,
+      "direct_ms": 4254.915624856949,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I have $500000 and want to risk 0.5% on NVDA. I'd enter at $81.89 with a stop at $73.05, what size?",
+      "expect": 282.81,
+      "source": "computation",
+      "gw_ms": 278.0331247486174,
+      "direct_ms": 4004.0151248686016,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I have $25000 and want to risk 0.5% on TSLA. I'd enter at $457 with a stop at $403.63, what size?",
+      "expect": 2.34,
+      "source": "computation",
+      "gw_ms": 87.86358404904604,
+      "direct_ms": 4219.79770809412,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "What is the news sentiment on AAPL this week?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4361.762749962509,
+      "direct_ms": 4065.0143339298666,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Show me a price chart for TSLA over the last year.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4434.258624911308,
+      "direct_ms": 4040.9856662154198,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Which stocks are the top gainers today?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4305.359917227179,
+      "direct_ms": 4142.505333293229,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "What does an R multiple mean in trading?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4719.789915718138,
+      "direct_ms": 8139.060333836824,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Explain what position sizing is.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 8401.87129098922,
+      "direct_ms": 4059.0890422463417,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Is NVDA overvalued right now?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4386.729540769011,
+      "direct_ms": 4049.275000113994,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "What is the 50-day moving average for MSFT?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 2253.4776250831783,
+      "direct_ms": 2068.996834103018,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Tell me about the company behind AMZN.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4443.03391687572,
+      "direct_ms": 4158.965332899243,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Give me the RSI for AMD.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 3328.1965842470527,
+      "direct_ms": 2772.3369169980288,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "What's the relative strength of META against the S&P 500?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4356.205542106181,
+      "direct_ms": 4513.578500133008,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Hello, what can you do?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4469.489125069231,
+      "direct_ms": 4175.610624719411,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Why do traders use stop losses?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4898.142707999796,
+      "direct_ms": 4704.832083079964,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "My account is $50,000, which sectors look strong?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4467.304584104568,
+      "direct_ms": 4346.95954201743,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "TSLA is trading at 250, is that a good level?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4606.247500050813,
+      "direct_ms": 4344.709457829595,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "What are the top losers today?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4775.772457942367,
+      "direct_ms": 4373.8544578664005,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Give me a 2:1 reward-to-risk profit target on TSLA: in at 409.43, out at 367.01 if wrong.",
+      "expect": 494.27,
+      "source": "computation",
+      "gw_ms": 227.8977078385651,
+      "direct_ms": 4159.3692088499665,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Give me a 2:1 reward-to-risk profit target on AAPL: in at 118.21, out at 113.63 if wrong.",
+      "expect": 127.37,
+      "source": "computation",
+      "gw_ms": 75.40408289059997,
+      "direct_ms": 4298.488124739379,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Give me a 5:1 reward-to-risk profit target on AMD: in at 192.71, out at 180.2 if wrong.",
+      "expect": 255.26,
+      "source": "computation",
+      "gw_ms": 86.81408315896988,
+      "direct_ms": 5026.493915822357,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Give me a 4:1 reward-to-risk profit target on TSLA: in at 280.47, out at 245.08 if wrong.",
+      "expect": 422.03,
+      "source": "computation",
+      "gw_ms": 296.6396249830723,
+      "direct_ms": 4354.035958182067,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "META trade idea, stop 53.47, entry 60.09. Compute the 5R take-profit.",
+      "expect": 93.19,
+      "source": "computation",
+      "gw_ms": 93.88320799916983,
+      "direct_ms": 4294.489332940429,
+      "gw_ok": true,
+      "direct_ok": true
+    },
+    {
+      "text": "TSLA trade idea, stop 76.57, entry 81.91. Compute the 2R take-profit.",
+      "expect": 92.59,
+      "source": "computation",
+      "gw_ms": 82.46733387932181,
+      "direct_ms": 3545.171458274126,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "AAPL trade idea, stop 212.45, entry 233.87. Compute the 3R take-profit.",
+      "expect": 298.13,
+      "source": "computation",
+      "gw_ms": 111.12674977630377,
+      "direct_ms": 5186.608207877725,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "AMD trade idea, stop 246.01, entry 254.08. Compute the 3R take-profit.",
+      "expect": 278.29,
+      "source": "computation",
+      "gw_ms": 259.89599991589785,
+      "direct_ms": 3815.2261250652373,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Using a stop price of $273.11 and an entry price of $316.11 on GOOGL, what's the profit target at 5 times my risk?",
+      "expect": 531.11,
+      "source": "computation",
+      "gw_ms": 68.85149981826544,
+      "direct_ms": 2479.48404122144,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Using a stop price of $19.28 and an entry price of $20.22 on MSFT, what's the profit target at 4 times my risk?",
+      "expect": 23.98,
+      "source": "computation",
+      "gw_ms": 80.79116744920611,
+      "direct_ms": 2339.7755408659577,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Using a stop price of $104.92 and an entry price of $116.93 on AAPL, what's the profit target at 2 times my risk?",
+      "expect": 140.95,
+      "source": "computation",
+      "gw_ms": 59.46287512779236,
+      "direct_ms": 2783.213166985661,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Using a stop price of $415.97 and an entry price of $475.08 on AAPL, what's the profit target at 4 times my risk?",
+      "expect": 711.52,
+      "source": "computation",
+      "gw_ms": 66.37329189106822,
+      "direct_ms": 2756.685957778245,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how far is a 4R target on AAPL when I get in at 375.44 and bail at 333.94",
+      "expect": 541.44,
+      "source": "fallback",
+      "gw_ms": 3716.1901658400893,
+      "direct_ms": 3451.3858328573406,
+      "gw_ok": false,
+      "direct_ok": false
+    },
+    {
+      "text": "how far is a 3R target on GOOGL when I get in at 53.76 and bail at 46.28",
+      "expect": 76.2,
+      "source": "computation",
+      "gw_ms": 86.63325011730194,
+      "direct_ms": 3800.369458273053,
+      "gw_ok": true,
+      "direct_ok": true
+    },
+    {
+      "text": "how far is a 5R target on AAPL when I get in at 296.59 and bail at 265.33",
+      "expect": 452.89,
+      "source": "computation",
+      "gw_ms": 64.71250019967556,
+      "direct_ms": 2977.200999855995,
+      "gw_ok": true,
+      "direct_ok": true
+    },
+    {
+      "text": "how far is a 3R target on NVDA when I get in at 461.2 and bail at 418.79",
+      "expect": 588.43,
+      "source": "computation",
+      "gw_ms": 70.40766719728708,
+      "direct_ms": 4288.423292338848,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "R-multiple calc: ticker GOOGL, entry 104.1, stop 90.41, multiple 3",
+      "expect": 145.17,
+      "source": "computation",
+      "gw_ms": 55.27549982070923,
+      "direct_ms": 4289.443333167583,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "R-multiple calc: ticker SHOP, entry 134.77, stop 117.62, multiple 3",
+      "expect": 186.22,
+      "source": "computation",
+      "gw_ms": 76.10525004565716,
+      "direct_ms": 4295.141374692321,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "R-multiple calc: ticker GOOGL, entry 425.81, stop 392.78, multiple 5",
+      "expect": 590.96,
+      "source": "computation",
+      "gw_ms": 68.12683306634426,
+      "direct_ms": 4292.872333433479,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "R-multiple calc: ticker AAPL, entry 67.77, stop 57.92, multiple 4",
+      "expect": 107.17,
+      "source": "computation",
+      "gw_ms": 57.8060420230031,
+      "direct_ms": 4291.300916112959,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "If I go long MSFT at 360.32 and my stop sits at 323.2, what does a 5R exit look like?",
+      "expect": 545.92,
+      "source": "computation",
+      "gw_ms": 106.42625018954277,
+      "direct_ms": 4370.061499997973,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "If I go long SHOP at 245.86 and my stop sits at 224.32, what does a 2R exit look like?",
+      "expect": 288.94,
+      "source": "computation",
+      "gw_ms": 75.14558266848326,
+      "direct_ms": 4507.418124936521,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "If I go long NVDA at 125.06 and my stop sits at 114.7, what does a 2R exit look like?",
+      "expect": 145.78,
+      "source": "computation",
+      "gw_ms": 216.5619172155857,
+      "direct_ms": 4241.373124998063,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "If I go long AMZN at 117.7 and my stop sits at 112.97, what does a 2R exit look like?",
+      "expect": 127.16,
+      "source": "computation",
+      "gw_ms": 75.9528330527246,
+      "direct_ms": 4271.260249894112,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "TSLA: buy 143.83, stop-loss 129.95. I want the 2R level.",
+      "expect": 171.59,
+      "source": "computation",
+      "gw_ms": 52.29137511923909,
+      "direct_ms": 4380.668083205819,
+      "gw_ok": true,
+      "direct_ok": true
+    },
+    {
+      "text": "AAPL: buy 101.08, stop-loss 90.39. I want the 3R level.",
+      "expect": 133.15,
+      "source": "computation",
+      "gw_ms": 152.1195420064032,
+      "direct_ms": 4265.560166910291,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "TSLA: buy 186.59, stop-loss 178.55. I want the 4R level.",
+      "expect": 218.75,
+      "source": "computation",
+      "gw_ms": 78.90816731378436,
+      "direct_ms": 4300.666500348598,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "NFLX: buy 288.84, stop-loss 250.38. I want the 2R level.",
+      "expect": 365.76,
+      "source": "computation",
+      "gw_ms": 94.78433290496469,
+      "direct_ms": 4261.272999923676,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Can you work out my target for a 4 to 1 payoff on AAPL? Entry is 238.4 and I'd stop out at 212.87.",
+      "expect": 340.52,
+      "source": "fallback",
+      "gw_ms": 3624.5566247962415,
+      "direct_ms": 3641.9796673581004,
+      "gw_ok": false,
+      "direct_ok": false
+    },
+    {
+      "text": "Can you work out my target for a 5 to 1 payoff on AAPL? Entry is 29.78 and I'd stop out at 27.59.",
+      "expect": 40.73,
+      "source": "fallback",
+      "gw_ms": 2022.3153750412166,
+      "direct_ms": 1636.8222921155393,
+      "gw_ok": false,
+      "direct_ok": false
+    },
+    {
+      "text": "Can you work out my target for a 2 to 1 payoff on TSLA? Entry is 356.03 and I'd stop out at 316.25.",
+      "expect": 435.59,
+      "source": "fallback",
+      "gw_ms": 3976.876124739647,
+      "direct_ms": 3885.637708939612,
+      "gw_ok": false,
+      "direct_ok": false
+    },
+    {
+      "text": "Can you work out my target for a 2 to 1 payoff on TSLA? Entry is 228.42 and I'd stop out at 204.24.",
+      "expect": 276.78,
+      "source": "fallback",
+      "gw_ms": 3615.986875258386,
+      "direct_ms": 3441.845958121121,
+      "gw_ok": false,
+      "direct_ok": false
+    },
+    {
+      "text": "stop 369.43, entry 384.9, NVDA, 4R please",
+      "expect": 446.78,
+      "source": "computation",
+      "gw_ms": 337.9164580255747,
+      "direct_ms": 3913.3253330364823,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "stop 321.13, entry 335.17, TSLA, 5R please",
+      "expect": 405.37,
+      "source": "computation",
+      "gw_ms": 319.00091702118516,
+      "direct_ms": 1924.5874173939228,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "stop 383.3, entry 417.2, AAPL, 5R please",
+      "expect": 586.7,
+      "source": "computation",
+      "gw_ms": 109.38500007614493,
+      "direct_ms": 1429.8677910119295,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "stop 265.87, entry 288.03, GOOGL, 2R please",
+      "expect": 332.35,
+      "source": "computation",
+      "gw_ms": 61.15787522867322,
+      "direct_ms": 1712.47575012967,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "With a 2% risk limit on a $500000 portfolio, how many AMD shares can I take if I buy at 236.82 and stop out at 227.6?",
+      "expect": 1084.6,
+      "source": "computation",
+      "gw_ms": 117.21545783802867,
+      "direct_ms": 4552.681458182633,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "With a 3% risk limit on a $50000 portfolio, how many GOOGL shares can I take if I buy at 307.84 and stop out at 279.91?",
+      "expect": 53.71,
+      "source": "computation",
+      "gw_ms": 109.68479188159108,
+      "direct_ms": 5607.871542219073,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "With a 3% risk limit on a $50000 portfolio, how many AMD shares can I take if I buy at 167.36 and stop out at 158.9?",
+      "expect": 177.3,
+      "source": "computation",
+      "gw_ms": 262.9593750461936,
+      "direct_ms": 4256.249415688217,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "With a 1.5% risk limit on a $50000 portfolio, how many AAPL shares can I take if I buy at 332 and stop out at 293.4?",
+      "expect": 19.43,
+      "source": "computation",
+      "gw_ms": 117.02670902013779,
+      "direct_ms": 4411.017541773617,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Size my SHOP trade: stop 24.94, entry 28.79, risking 1 percent of $75000.",
+      "expect": 194.81,
+      "source": "computation",
+      "gw_ms": 84.29920766502619,
+      "direct_ms": 4327.502000145614,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Size my AAPL trade: stop 329.72, entry 373.84, risking 1 percent of $500000.",
+      "expect": 113.33,
+      "source": "computation",
+      "gw_ms": 85.2880422025919,
+      "direct_ms": 4311.244999989867,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Size my AAPL trade: stop 408.29, entry 472.65, risking 3 percent of $10000.",
+      "expect": 4.66,
+      "source": "computation",
+      "gw_ms": 77.13629072532058,
+      "direct_ms": 4371.115166228265,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Size my META trade: stop 429.61, entry 460.89, risking 2 percent of $25000.",
+      "expect": 15.98,
+      "source": "computation",
+      "gw_ms": 119.42570796236396,
+      "direct_ms": 4439.41545765847,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Entry price $102.2, stop price $87, AMZN. Account size is $75000; risk percent 3. Shares?",
+      "expect": 148.03,
+      "source": "computation",
+      "gw_ms": 77.50033400952816,
+      "direct_ms": 4273.759999778122,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Entry price $102.39, stop price $90.38, AAPL. Account size is $50000; risk percent 3. Shares?",
+      "expect": 124.9,
+      "source": "computation",
+      "gw_ms": 101.9845837727189,
+      "direct_ms": 4223.337833303958,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Entry price $250.19, stop price $242.59, NFLX. Account size is $25000; risk percent 2. Shares?",
+      "expect": 65.79,
+      "source": "computation",
+      "gw_ms": 82.74429198354483,
+      "direct_ms": 4554.240500088781,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Entry price $60.12, stop price $57.83, MSFT. Account size is $250000; risk percent 2. Shares?",
+      "expect": 2183.41,
+      "source": "computation",
+      "gw_ms": 152.8558749705553,
+      "direct_ms": 4769.674042239785,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how big should my NVDA position be? 10000 account, 2% risk, buy 227.23, stop 198.51",
+      "expect": 6.96,
+      "source": "computation",
+      "gw_ms": 228.1976672820747,
+      "direct_ms": 4516.140583902597,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how big should my NFLX position be? 500000 account, 1.5% risk, buy 281.65, stop 269.12",
+      "expect": 598.56,
+      "source": "computation",
+      "gw_ms": 102.5640838779509,
+      "direct_ms": 4270.641166251153,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how big should my AMD position be? 10000 account, 0.5% risk, buy 170.17, stop 164.7",
+      "expect": 9.14,
+      "source": "computation",
+      "gw_ms": 84.7393749281764,
+      "direct_ms": 4286.175792105496,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how big should my MSFT position be? 10000 account, 1.5% risk, buy 131.45, stop 117.89",
+      "expect": 11.06,
+      "source": "computation",
+      "gw_ms": 217.70466677844524,
+      "direct_ms": 4369.468042161316,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Given a $50000 account and a risk of 0.5% of it, determine the share count for NFLX, in at 469.3, protective stop at 451.41.",
+      "expect": 13.97,
+      "source": "computation",
+      "gw_ms": 104.54629082232714,
+      "direct_ms": 4316.745874937624,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Given a $50000 account and a risk of 3% of it, determine the share count for META, in at 252.17, protective stop at 215.47.",
+      "expect": 40.87,
+      "source": "computation",
+      "gw_ms": 80.78662492334843,
+      "direct_ms": 4236.380000133067,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Given a $10000 account and a risk of 1% of it, determine the share count for GOOGL, in at 373.39, protective stop at 339.22.",
+      "expect": 2.93,
+      "source": "computation",
+      "gw_ms": 77.59175030514598,
+      "direct_ms": 4293.657667003572,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "Given a $100000 account and a risk of 1.5% of it, determine the share count for TSLA, in at 217.31, protective stop at 185.63.",
+      "expect": 47.35,
+      "source": "computation",
+      "gw_ms": 75.957375112921,
+      "direct_ms": 4288.94262528047,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I'm risking 3% of my $250000 account on NVDA. Buy at 236.46, stop at 229.36. How many shares?",
+      "expect": 1056.34,
+      "source": "computation",
+      "gw_ms": 56.88216723501682,
+      "direct_ms": 4063.8172500766814,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I'm risking 0.5% of my $250000 account on AMD. Buy at 455.04, stop at 413.68. How many shares?",
+      "expect": 30.22,
+      "source": "computation",
+      "gw_ms": 62.43041716516018,
+      "direct_ms": 3432.3499999009073,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I'm risking 3% of my $500000 account on MSFT. Buy at 222.13, stop at 203.7. How many shares?",
+      "expect": 813.89,
+      "source": "computation",
+      "gw_ms": 104.63608289137483,
+      "direct_ms": 4285.264584235847,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "I'm risking 1.5% of my $100000 account on NVDA. Buy at 260.48, stop at 247.78. How many shares?",
+      "expect": 118.11,
+      "source": "computation",
+      "gw_ms": 88.27579114586115,
+      "direct_ms": 3799.0116248838603,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "AMZN position sizing: $500000 account, 3 percent risk, entry $328.8, stop $317.15",
+      "expect": 1287.55,
+      "source": "computation",
+      "gw_ms": 53.6492089740932,
+      "direct_ms": 3962.447749916464,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "MSFT position sizing: $100000 account, 3 percent risk, entry $160.05, stop $138.75",
+      "expect": 140.85,
+      "source": "computation",
+      "gw_ms": 134.66320792213082,
+      "direct_ms": 4518.751499708742,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "AMZN position sizing: $100000 account, 0.5 percent risk, entry $283.57, stop $247.87",
+      "expect": 14.01,
+      "source": "computation",
+      "gw_ms": 270.1425417326391,
+      "direct_ms": 4287.477375008166,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "NFLX position sizing: $100000 account, 0.5 percent risk, entry $22.27, stop $19.94",
+      "expect": 214.59,
+      "source": "computation",
+      "gw_ms": 92.37241698428988,
+      "direct_ms": 3481.322333216667,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "My stop on NFLX is 404.54 and I'm getting in at 441.98; with 100000 in the account and 0.5% risk, what's the size?",
+      "expect": 13.35,
+      "source": "computation",
+      "gw_ms": 54.40624989569187,
+      "direct_ms": 3086.9606249034405,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "My stop on AMD is 54.71 and I'm getting in at 62.88; with 100000 in the account and 2% risk, what's the size?",
+      "expect": 244.8,
+      "source": "computation",
+      "gw_ms": 67.62370793148875,
+      "direct_ms": 4271.003541070968,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "My stop on GOOGL is 419.63 and I'm getting in at 443.56; with 75000 in the account and 1.5% risk, what's the size?",
+      "expect": 47.01,
+      "source": "computation",
+      "gw_ms": 71.93129183724523,
+      "direct_ms": 4012.0282089337707,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "My stop on MSFT is 205.62 and I'm getting in at 237.65; with 75000 in the account and 2% risk, what's the size?",
+      "expect": 46.83,
+      "source": "computation",
+      "gw_ms": 70.53591683506966,
+      "direct_ms": 3339.6590002812445,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how many NFLX shares if account size = 100000, risk percent = 0.5, entry price = 165.92, stop price = 144.84",
+      "expect": 23.72,
+      "source": "computation",
+      "gw_ms": 103.81933441385627,
+      "direct_ms": 4279.876749962568,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how many AMZN shares if account size = 10000, risk percent = 0.5, entry price = 79.55, stop price = 75.06",
+      "expect": 11.14,
+      "source": "computation",
+      "gw_ms": 86.90483402460814,
+      "direct_ms": 4281.659041997045,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how many MSFT shares if account size = 50000, risk percent = 1.5, entry price = 91.54, stop price = 77.94",
+      "expect": 55.15,
+      "source": "computation",
+      "gw_ms": 105.49879213795066,
+      "direct_ms": 4284.998542163521,
+      "gw_ok": true,
+      "direct_ok": false
+    },
+    {
+      "text": "how many META shares if account size = 75000, risk percent = 3, entry price = 132.45, stop price = 120.51",
+      "expect": 188.44,
+      "source": "fallback",
+      "gw_ms": 4366.318125277758,
+      "direct_ms": 4150.256959255785,
+      "gw_ok": false,
+      "direct_ok": false
+    },
+    {
+      "text": "What are analysts saying about GOOGL?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4325.025917030871,
+      "direct_ms": 4118.92120866105,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Plot NFLX against its 200-day average.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4320.949375163764,
+      "direct_ms": 4363.197749946266,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Define risk percent in portfolio management.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4475.041291676462,
+      "direct_ms": 4125.775874592364,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "What was the 52 week high for SHOP?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 1024.7924169525504,
+      "direct_ms": 822.9702496901155,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Should I hold AMD through earnings?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4382.153833284974,
+      "direct_ms": 4158.130624797195,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "How do R multiples relate to expectancy?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4452.680207788944,
+      "direct_ms": 4125.205458141863,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Compare AAPL and MSFT fundamentals.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4350.803249981254,
+      "direct_ms": 4120.6980417482555,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "I have $25,000 to invest, any ideas?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4379.813041072339,
+      "direct_ms": 4144.963750150055,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "What is a good risk to reward ratio?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4422.778249718249,
+      "direct_ms": 4299.459459260106,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "NVDA gapped up at 480, what does that mean?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4767.284082714468,
+      "direct_ms": 4163.204041309655,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Which stocks have the strongest momentum?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4420.304457657039,
+      "direct_ms": 4130.99587475881,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Can you explain how stop losses get hunted?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4296.356082893908,
+      "direct_ms": 4118.1020410731435,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Summarize the latest TSLA earnings call.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4335.626250132918,
+      "direct_ms": 4119.98924985528,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "What's the support and resistance for META?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4315.505209378898,
+      "direct_ms": 4120.105457957834,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Is a 2% risk per trade too aggressive in general?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4299.994874745607,
+      "direct_ms": 4143.627000041306,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Who is the CEO of AMZN?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 1111.578541342169,
+      "direct_ms": 872.2428749315441,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "What happened to the market today?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4265.0954579003155,
+      "direct_ms": 4146.637333091348,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "List the biggest losers in tech.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4615.974915679544,
+      "direct_ms": 4092.6771671511233,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "Teach me about technical analysis.",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 4444.529875181615,
+      "direct_ms": 4134.913417045027,
+      "gw_ok": null,
+      "direct_ok": null
+    },
+    {
+      "text": "How much is 3 times 7?",
+      "expect": "refuse",
+      "source": "fallback",
+      "gw_ms": 681.8790421821177,
+      "direct_ms": 509.90779185667634,
+      "gw_ok": null,
+      "direct_ok": null
+    }
+  ]
+}
