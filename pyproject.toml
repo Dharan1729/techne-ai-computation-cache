@@ -4,25 +4,50 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-computation-cache"
-version = "0.1.0"
-description = "Investigating computation-structure reuse vs. response caching for AI workloads whose parameters change per request."
+version = "0.2.0"
+description = "Answer calculation-shaped LLM requests with your own code, and send everything else to the model. Includes an OpenAI-compatible gateway, evaluation tooling and research benchmarks."
 readme = "README.md"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Dharan"}]
+keywords = ["llm", "cache", "router", "gateway", "openai", "function-calling", "evaluation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# The core is small on purpose. Heavy packages are optional extras.
 dependencies = [
     "numpy",
-    "scipy",
-    "scikit-learn",
-    "sentence-transformers",
-    "matplotlib",
-    "httpx",
-    "pandas",
+    "httpx>=0.24",
+    "pyyaml",
+    "pydantic>=2",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+embeddings = ["sentence-transformers"]     # local embedding model (default embedder)
+serve = ["fastapi>=0.100", "uvicorn"]      # `aicache serve`, the OpenAI-compatible gateway
+langchain = ["langchain-core"]             # aicache.integrations.langchain
+research = ["scipy", "scikit-learn", "pandas", "matplotlib"]   # benchmarks and plots
+dev = ["pytest", "ai-computation-cache[embeddings,serve,langchain,research]"]
+
+[project.scripts]
+aicache = "aicache.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Dharan1729/techne-ai-computation-cache"
+Issues = "https://github.com/Dharan1729/techne-ai-computation-cache/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+aicache = ["py.typed"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

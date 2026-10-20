@@ -1220,3 +1220,37 @@ showed Level 1/2's single-seed "0% invalid" did not survive more seeds.
   correctness here comes from that choice, so the Level 1/2 and Level 3/4
   semantic numbers are not directly comparable. A threshold sweep at Level 3/4
   was not rerun in this pass.
+
+---
+
+## EXP-018 — The gateway end to end, in front of a real local LLM
+
+**Date**: 2026-10-20. **Setup**: `aicache serve` with `examples/finance_tools.yaml` (real embedding model, `redis/langcache-embed-v1`, similarity 0.45), in front of Ollama's OpenAI-compatible endpoint (llama3 8B, temperature 0, seed 0, `max_tokens` 200 on every call). Every request in `examples/finance_labeled.jsonl` (131: 96 should compute, 35 should be refused) was sent through the gateway and, separately, straight to Ollama. Script: `benchmarks/gateway_e2e.py`. Raw rows: `results/gateway_e2e.json`.
+
+| | Result |
+|---|---|
+| Computable requests answered by a tool, correctly | 90 of 96 |
+| Wrong answers computed | 0 |
+| Requests that should be refused, but were computed | 0 of 35 |
+| Computable requests forwarded to the model instead | 6 |
+
+The 6 forwarded requests were phrasings the slots do not handle: four "N to 1 payoff" requests, one "account size = 75000, risk percent = 3" request, and one "get in at ... and bail at ..." request. They were refused, not guessed, so the model answered them. The reason recorded for each is the closest candidate tool's failure, which is not always the tool the user meant.
+
+**Latency** (one run, one laptop, model and embedder sharing the same machine):
+
+| | Median |
+|---|---|
+| Computed by a tool, through the gateway | 88 ms |
+| Forwarded to the model, through the gateway | 4.4 s |
+| Same requests straight to the model | 4.2 s |
+| Forwarded requests: paired difference, gateway minus direct | +224 ms |
+
+The +224 ms is what the gateway adds to a request it cannot answer: embedding the request, one proxy hop, and run-to-run noise. It is real cost. Mean latency over this particular mix was 1.36 s through the gateway against 3.95 s direct, but that depends entirely on the share of computable requests (73% here, of which 69% of all requests were computed) and on how long model replies are (capped at 200 tokens), so it should not be quoted as a general speedup.
+
+**What this does not show**:
+- The "direct LLM" correctness the script also records (7 of 96) is not a fair baseline: the direct path has no tool use and its replies are truncated at 200 tokens, so the last number is often not the final answer. The fair baseline is EXP-015.
+- The labeled set is built from the finance benchmark's phrasing templates. The example config's slots were written after seeing failures on the development templates, so coverage on these phrasings is optimistic. The 6 misses are mostly the holdout templates.
+- Expected values come from the same formulas the tools use, so this checks routing and binding, not whether the formulas are right.
+- One run, no repeats. 0 bad executions in 131 requests gives a 95% upper bound of about 3%.
+
+**Also checked**: the same config with the dependency-free hashing embedder was run in the Docker image (non-root, 357 MB, no torch): computed locally, forwarded to the host's Ollama, enforced the admin token, and reported stats. The core `pip install` is 77 MB against about 1.2 GB with the embedding model.
