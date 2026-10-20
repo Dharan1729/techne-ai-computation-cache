@@ -11,6 +11,7 @@ accumulate" a meaningful thing to plot.
 
 from __future__ import annotations
 
+import os
 import time
 
 from aicache.cache.computation import ComputationCache
@@ -168,7 +169,11 @@ def run_computation_cache(
     """Identify -> retrieve reusable computation -> bind fresh params ->
     validate -> execute directly. No LLM call on a hit; falls back to the
     LLM whenever identification or binding can't be validated."""
-    cache = ComputationCache(identifier=identifier or TaskIdentifier())
+    # AICACHE_NO_CUES=1 disables the lexical-cue guard, for the EXP-016 ablation only.
+    cache = ComputationCache(
+        identifier=identifier or TaskIdentifier(),
+        use_lexical_cues=os.environ.get("AICACHE_NO_CUES") != "1",
+    )
     results: list[RequestResult] = []
     for item in workload:
         t0 = time.perf_counter()

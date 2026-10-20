@@ -43,6 +43,13 @@ class TaskSpec:
     freshness_requirements: str  # documentation only for Level 1/2 (always "static")
     example_phrasings: list[str]
     level: int = 1
+    # Optional regexes (case-insensitive). If non-empty, a request must match
+    # at least one of them for this task to be accepted. Added after a
+    # multi-seed run showed the embedding match can confuse tasks that share
+    # a parameter signature (add/subtract/multiply all take two numbers), so
+    # the shape-only validation gate could not catch the confusion. See
+    # docs/experiment-log.md, EXP-016.
+    lexical_cues: tuple[str, ...] = ()
 
     @property
     def required_param_names(self) -> list[str]:
@@ -86,6 +93,7 @@ _register(
             "Can you sum X and Y?",
             "What do you get if you add X and Y?",
         ],
+        lexical_cues=(r"\+", r"\bplus\b", r"\badd(?:ed|ing|s)?\b", r"\bsum\b", r"\btotal\b", r"\bcombined\b"),
     )
 )
 
@@ -102,6 +110,7 @@ _register(
             "Calculate the difference between X and Y.",
             "What do you get if you take Y away from X?",
         ],
+        lexical_cues=(r"\s-\s", r"\bminus\b", r"\bsubtract\w*", r"\bdifference\b", r"\btake(?:s|n)?\s+(?:\w+\s+)?away\b", r"\bless\b", r"\bfewer\b"),
     )
 )
 
@@ -118,6 +127,7 @@ _register(
             "Calculate the product of X and Y.",
             "What do you get if you multiply X and Y together?",
         ],
+        lexical_cues=(r"\*", r"\u00d7", r"\btimes\b", r"\bmultipl\w*", r"\bproduct\b"),
     )
 )
 

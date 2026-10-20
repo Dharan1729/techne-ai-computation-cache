@@ -41,8 +41,19 @@ class OllamaNotConfigured(RuntimeError):
 class OllamaLLM(LLMClient):
     backend_name = "ollama"
 
-    def __init__(self, model_name: str = DEFAULT_OLLAMA_MODEL, timeout_s: float = 120.0) -> None:
+    def __init__(
+        self,
+        model_name: str = DEFAULT_OLLAMA_MODEL,
+        timeout_s: float = 120.0,
+        options: dict[str, Any] | None = None,
+        response_format: str | None = None,
+    ) -> None:
         self.model_name = model_name
+        # Sampling options passed straight to Ollama (e.g.
+        # {"temperature": 0, "seed": 0}) so a benchmark run can pin
+        # determinism instead of sampling at the model's default.
+        self.options = options
+        self.response_format = response_format
         self._client = httpx.Client(base_url=_API_BASE, timeout=timeout_s)
         try:
             resp = self._client.get("/api/version")
@@ -57,10 +68,12 @@ class OllamaLLM(LLMClient):
         # task_hint is intentionally ignored — see gemini.py's docstring
         # for why: a real backend only ever sees what a real call would.
         start = time.monotonic()
-        resp = self._client.post(
-            "/api/generate",
-            json={"model": self.model_name, "prompt": prompt, "stream": False},
-        )
+        payload: dict[str, Any] = {"model": self.model_name, "prompt": prompt, "stream": False}
+        if self.options:
+            payload["options"] = self.options
+        if self.response_format:
+            payload["format"] = self.response_format
+        resp = self._client.post("/api/generate", json=payload)
         elapsed_ms = (time.monotonic() - start) * 1000
         resp.raise_for_status()
         data = resp.json()

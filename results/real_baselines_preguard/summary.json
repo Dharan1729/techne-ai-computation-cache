@@ -1,0 +1,138 @@
+{
+  "model": "llama3",
+  "seed": 42,
+  "temperature": 0,
+  "n_requests": 150,
+  "conditions": {
+    "llm_direct": {
+      "n": 150,
+      "correct": 71,
+      "accuracy": 0.47333333333333333,
+      "wilson95": [
+        0.39509757671394596,
+        0.5529008840404923
+      ],
+      "p50_ms": 1113.6217494495213,
+      "p95_ms": 3312.784915789962,
+      "mean_ms": 1518.133855011935,
+      "llm_call_rate": 1.0,
+      "mean_input_tokens": 24.446666666666665,
+      "mean_output_tokens": 67.44666666666667,
+      "accuracy_by_task": {
+        "add": 1.0,
+        "compound_interest": 0.0,
+        "discounted_price": 0.4444444444444444,
+        "margin": 0.0,
+        "multiply": 0.2222222222222222,
+        "percentage": 0.5,
+        "revenue": 0.3888888888888889,
+        "subtract": 0.9444444444444444,
+        "tax": 0.6666666666666666
+      }
+    },
+    "llm_cot": {
+      "n": 150,
+      "correct": 71,
+      "accuracy": 0.47333333333333333,
+      "wilson95": [
+        0.39509757671394596,
+        0.5529008840404923
+      ],
+      "p50_ms": 2458.937250310555,
+      "p95_ms": 4494.788666255772,
+      "mean_ms": 2657.4412113645426,
+      "llm_call_rate": 1.0,
+      "mean_input_tokens": 49.446666666666665,
+      "mean_output_tokens": 125.05333333333333,
+      "accuracy_by_task": {
+        "add": 0.8333333333333334,
+        "compound_interest": 0.05555555555555555,
+        "discounted_price": 0.6666666666666666,
+        "margin": 0.0,
+        "multiply": 0.3888888888888889,
+        "percentage": 0.3333333333333333,
+        "revenue": 0.5,
+        "subtract": 0.7222222222222222,
+        "tax": 0.6666666666666666
+      }
+    },
+    "llm_router": {
+      "n": 150,
+      "correct": 139,
+      "accuracy": 0.9266666666666666,
+      "wilson95": [
+        0.873463014734016,
+        0.9585616131949707
+      ],
+      "p50_ms": 1142.2957703471184,
+      "p95_ms": 1374.8335000127554,
+      "mean_ms": 1156.3877402432263,
+      "llm_call_rate": 1.0,
+      "mean_input_tokens": 224.48,
+      "mean_output_tokens": 17.46,
+      "accuracy_by_task": {
+        "add": 1.0,
+        "compound_interest": 1.0,
+        "discounted_price": 0.8333333333333334,
+        "margin": 1.0,
+        "multiply": 1.0,
+        "percentage": 1.0,
+        "revenue": 1.0,
+        "subtract": 0.5555555555555556,
+        "tax": 1.0
+      }
+    },
+    "comp_cache": {
+      "n": 150,
+      "correct": 131,
+      "accuracy": 0.8733333333333333,
+      "wilson95": [
+        0.8106321928453123,
+        0.9173893565925509
+      ],
+      "p50_ms": 95.51043785177171,
+      "p95_ms": 1522.9010828770697,
+      "mean_ms": 365.72423305052024,
+      "llm_call_rate": 0.22666666666666666,
+      "mean_input_tokens": 4.6466666666666665,
+      "mean_output_tokens": 11.046666666666667,
+      "accuracy_by_task": {
+        "add": 1.0,
+        "compound_interest": 1.0,
+        "discounted_price": 1.0,
+        "margin": 0.8333333333333334,
+        "multiply": 0.5555555555555556,
+        "percentage": 0.5555555555555556,
+        "revenue": 1.0,
+        "subtract": 0.9444444444444444,
+        "tax": 1.0
+      }
+    },
+    "hybrid": {
+      "n": 150,
+      "correct": 146,
+      "accuracy": 0.9733333333333334,
+      "wilson95": [
+        0.9334450938998244,
+        0.9895822277088953
+      ],
+      "p50_ms": 95.51043785177171,
+      "p95_ms": 1173.625832889229,
+      "mean_ms": 344.3754733136545,
+      "llm_call_rate": 0.22666666666666666,
+      "mean_input_tokens": 49.98,
+      "mean_output_tokens": 3.7533333333333334,
+      "accuracy_by_task": {
+        "add": 1.0,
+        "compound_interest": 1.0,
+        "discounted_price": 1.0,
+        "margin": 1.0,
+        "multiply": 1.0,
+        "percentage": 1.0,
+        "revenue": 1.0,
+        "subtract": 0.7777777777777778,
+        "tax": 1.0
+      }
+    }
+  }
+}

@@ -24,6 +24,7 @@ requirement from the brief's §11.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from ..binding.extractor import extract_numbers
@@ -42,8 +43,12 @@ class ComputationLookupResult:
 
 
 class ComputationCache:
-    def __init__(self, identifier: TaskIdentifier | None = None) -> None:
+    def __init__(
+        self, identifier: TaskIdentifier | None = None, use_lexical_cues: bool = True
+    ) -> None:
         self.identifier = identifier or TaskIdentifier()
+        # Switchable only so an ablation (EXP-016) can measure the guard's effect.
+        self.use_lexical_cues = use_lexical_cues
 
     def lookup(self, text: str) -> ComputationLookupResult:
         ident = self.identifier.identify(text)
@@ -52,6 +57,15 @@ class ComputationCache:
                 hit=False,
                 similarity=ident.similarity,
                 reason="task_identification_below_threshold",
+            )
+
+        cues = getattr(ident.task_spec, "lexical_cues", ()) if self.use_lexical_cues else ()
+        if cues and not any(re.search(c, text, flags=re.IGNORECASE) for c in cues):
+            return ComputationLookupResult(
+                hit=False,
+                task_type=ident.task_type,
+                similarity=ident.similarity,
+                reason="lexical_cue_missing",
             )
 
         raw_numbers = extract_numbers(text)

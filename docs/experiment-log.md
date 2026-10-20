@@ -1,5 +1,10 @@
 # Experiment Log
 
+> **Reading this log.** Entries EXP-001 to EXP-014 are single-seed. EXP-015 to
+> EXP-017 (2026-10-20) re-test them with fairer baselines and 10 seeds, and
+> overturn or narrow several earlier headline claims. Where they disagree, trust
+> the later entries.
+
 All runs use the deterministic `simulated` LLM backend (see
 `aicache/llm/simulated.py`) — no real API calls, no real money spent.
 Every number below is reproducible: `python -m benchmarks.run_experiment
@@ -1070,3 +1075,148 @@ illustrative re-query cadence, not a claim about real traffic patterns
 — see `docs/level4.md`'s Limitations section.
 
 **Next**: none planned for this phase.
+
+---
+
+## EXP-015 — Fairer real-model baselines, and a real-app integration
+
+**Date**: 2026-10-20. **Model**: llama3 8B via Ollama, temperature 0, seed 0.
+**Why**: EXP-008's baseline was the weakest honest one (raw question, default
+sampling, no tool). That inflated the gap. This run adds the baselines a
+reviewer would ask for. Script: `benchmarks/real_baselines.py`.
+
+**Same 150 requests (seed 42), guard on**:
+
+| Condition | Correct | 95% interval | Median latency | LLM calls |
+|---|---|---|---|---|
+| LLM answers directly | 71/150 (47%) | 40-55% | 1.1 s | 100% |
+| LLM, step-by-step prompt | 71/150 (47%) | 40-55% | 2.5 s | 100% |
+| LLM picks task + params, code computes | 139/150 (93%) | 87-96% | 1.2 s | 100% |
+| Computation cache, LLM on fallback | 131/150 (87%) | 81-92% | 129 ms | 23% |
+| Computation cache, router on fallback | 146/150 (97%) | 93-99% | 129 ms | 23% |
+
+- The fair baseline is the router row, not the direct row. Against it the
+  hybrid is not significantly more accurate (intervals overlap). It is faster:
+  median 129 ms vs 1.2 s, mean 370 ms vs 1215 ms.
+- Cache hits were 116/116 correct on this seed. Fallbacks to raw LLM answers
+  were only 15/34 correct, which is why "cache + raw LLM fallback" scores 87%.
+- Cache lookup is about 11 ms on an idle machine and about 30 ms right after a
+  local LLM call. The 129 ms median includes contention with the local model
+  on the same laptop. The conservative number is the one quoted.
+- A 1B model with the same router prompt got 52/60 on the first 60 requests.
+  The earlier "1B fails" spike used a naive prompt, so that conclusion was
+  prompt-specific and should not be cited as "small models cannot do this".
+- The router's weakest task was subtract (it mis-ordered "subtract Y from X").
+
+**Real-app integration** (`benchmarks/real_app/financial_chat_integration.py`,
+wshobson/financial-chat, two risk tools imported unmodified, 144 positive and
+20 negative requests, phrasing templates split into calibration / dev / fresh
+holdout):
+
+| System | Correct (of 144) | Wrong answers executed | Median latency |
+|---|---|---|---|
+| LLM router (llama3 over the real tool schemas) | 133 (92%) | 10 | 1.6 s |
+| Cache, extractor v2 | 111 (77%) | 0 | 12 ms |
+| Hybrid (cache, router on reject) | 141 (98%) | 2 | 12 ms, mean 385 ms vs 1629 ms |
+
+- Negatives (should trigger nothing): router fired on 1 of 20, cache on 0.
+- Extractor v1 (first pass) executed 66/144 correctly and 0 wrongly: it
+  rejected rather than guessed. v2 was built after seeing v1's failures on the
+  dev templates, so dev numbers are optimistic. On the fresh holdout the cache
+  executed 41/64 (64%) with 0 wrong; the router got 62/64, the hybrid 63/64.
+- The router's wrong executions were silent unit errors. In all 5 inspected,
+  "0.5%" was passed as 0.005, the tool expects percent, and it returned a
+  share count 100x too small with no error. A clearer tool description would
+  probably remove this. That fix was not tested.
+- **Embedding similarity alone cannot gate this domain.** Positive requests
+  scored 0.46-0.67, topical negatives 0.37-0.70. A threshold with zero
+  calibration false triggers (0.78) accepted none of the 164 requests. The
+  structural gate (every number must bind to exactly one slot, none left over)
+  did the real rejecting: 0 of 20 negatives passed it.
+- Limitations: templated phrasings, not real user logs; one 8B model; the
+  router prompt was rewritten once after a baseline flaw (the first prompt
+  invited `{"value": x}` wrappers) and the corrected prompt is the one reported.
+
+---
+
+## EXP-016 — Multi-seed rerun finds invalid hits; lexical-cue guard; repetition sweep
+
+**Date**: 2026-10-20. Simulated backend, 150 requests per seed.
+
+**Finding**: the single-seed "0% invalid hits" headline (EXP-004/008) does not
+hold across seeds. Over 10 seeds the computation cache made 20 invalid hits in
+1500 requests (1.3%; 0-4 per seed). Every one was a terse arithmetic request
+matched to the wrong task of the same signature, for example "508 + 780 = ?"
+identified as subtract at similarity 0.55. The validation gate checks
+parameter count and finiteness only, so it cannot see this.
+
+**Fix**: optional `lexical_cues` on a task: a request must contain at least
+one operator cue for the identified task or the cache falls back. Added for
+add, subtract and multiply only. Switchable for ablation
+(`AICACHE_NO_CUES=1`). Cues were written after seeing the failures, from
+general operator vocabulary. Seeds 6-10 were not used while writing it, but
+the workload templates are the same, so this is in-distribution evidence.
+
+| | Invalid hits (of 750) | Hit rate |
+|---|---|---|
+| Seeds 1-5, no guard | 12 | 76.0% |
+| Seeds 1-5, guard | 0 | 74.4% |
+| Seeds 6-10, no guard | 8 | 75.6% |
+| Seeds 6-10, guard | 0 | 74.5% |
+
+**Repetition sweep** (guard on, seeds 6-10, share of requests repeating an
+earlier request's exact numbers; correct cache hits only):
+
+| Repeat rate | Computation cache | Semantic cache |
+|---|---|---|
+| 0% | 74.6% | 0.0% |
+| 50% | 75.9% | 49.0% |
+| 64% | 74.5% | 63.3% |
+| 69% | 72.4% | 68.0% |
+
+Both stayed 99-100% correct. The semantic cache here uses
+`redis/langcache-embed-v1` at 0.75; EXP-006 showed a weaker default embedding
+model (GPTCache out of the box) is far less safe, so this is not a claim about
+all semantic caches.
+
+**Known open gap**: the arithmetic validator still cannot catch out-of-order
+numbers. "Over 3 years at 5 percent, what does $1000 grow to?" binds to
+(3, 5, 1000) and returns 4.6e21. The benchmark workload never states numbers
+out of order, so its results do not test this. The financial-chat extractor
+does handle order.
+
+Figures: `results/figures/` (generated by `benchmarks/plot_linkedin.py` from
+the result files). Raw runs: `results/real_baselines/`,
+`results/real_app_financial_chat.json`, `results/sweeps/`.
+
+---
+
+## EXP-017 — Level 3 and Level 4 rerun across 10 seeds
+
+**Date**: 2026-10-20. Simulated backend, seeds 1-10 (workload seed and database
+seed set equal). Raw summaries: `results/sweeps/level34/`. Done because EXP-016
+showed Level 1/2's single-seed "0% invalid" did not survive more seeds.
+
+| | Requests/seed | Hit rate | Correct (mean, worst seed) | Wrong hits |
+|---|---|---|---|---|
+| L3 computation cache | 225 | 97.5% | 100.0% (99.6%) | 1 in 2250 (seed 7) |
+| L3 semantic cache | 225 | 84.4% | 64.1% (56.4%) | 65-98 per seed |
+| L3 exact cache | 225 | 2.4% | 100% | 0 |
+| L4 graph computation cache | 180 | 99.4% | 100.0% (100.0%) | 0 in 1800 |
+| L4 semantic cache | 180 | 95.2% | 38.2% (22.8%) | 91-139 per seed |
+
+- The earlier L3/L4 claim of 0% invalid hits is nearly right but not exact: one
+  wrong hit appeared in 2250 L3 requests. It was not investigated further here.
+- The semantic cache is far less safe here than at Level 1/2 (64% and 38% correct
+  vs 99%) with the same embedding model. Requests differ only by an entity id
+  (for example a customer), which embeddings barely register.
+- The stale-fetch / TTL ablations score the same as the fresh cache in these
+  runs because the workload never mutates data mid-run. Correctness under
+  mutation is measured only by EXP-010 (three hand-picked scenarios: fresh cache
+  3/3, stale ablation 0/3, semantic cache 0/3) and EXP-014. Do not quote the
+  static-workload number as freshness evidence.
+- **Threshold caveat**: the L3/L4 harness defaults the semantic cache to similarity
+  0.65, looser than the 0.75 used at Level 1/2. Part of the lower semantic
+  correctness here comes from that choice, so the Level 1/2 and Level 3/4
+  semantic numbers are not directly comparable. A threshold sweep at Level 3/4
+  was not rerun in this pass.

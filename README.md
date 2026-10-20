@@ -1,337 +1,225 @@
 # ai-computation-cache
 
-This repository investigates whether some AI workloads benefit more from
-caching **reusable computation structure** than from caching **final
-responses** — and, where they do, what that costs in terms of coverage
-(how often reuse is even possible) versus what response caching gains in
-correctness risk.
+A research prototype that tests one idea: for LLM requests whose answer depends on parameters, **cache the computation, not the answer**.
 
-It is a controlled engineering investigation, not a product and not a
-paper claiming a new technique. See `docs/prior-art.md` for what's
-established prior art (exact caching, semantic caching, plan caching,
-cost-aware eviction) versus what this repo actually tests (one specific
-combination of representation, identification, binding, and validation,
-on a narrow, deterministic workload family).
-
-## Problem
-
-Exact-match caching only reuses byte-identical requests. Semantic
-caching relaxes that to "similar enough" requests — which is unsafe when
-a request's *answer* depends on parameters that vary independently of
-its *wording*:
+A semantic cache decides two requests are "the same" because their wording is close. That fails when the answer depends on numbers or ids that the wording barely shows.
 
 ```
-"What is X + Y?"        X=10,  Y=20   -> 30
-"Calculate X plus Y."   X=51,  Y=93   -> 144
-"Can you sum X and Y?"  X=712, Y=381  -> 1093
+"What is 10 + 20?"     -> 30
+"What is 712 + 381?"   -> 1093
 ```
 
-These three requests are near-identical in wording and completely
-different in answer. What's stable across them isn't the response —
-it's the computational structure, `ADD(x, y)`. Full write-up:
-`docs/problem.md`.
+An embedding model sees these as nearly the same sentence. A semantic cache can return 30 for the second one, with full confidence.
 
-## Hypothesis
+The alternative tested here: identify the operation, extract the current parameters, validate them, and run deterministic code. If validation fails, fall back to the LLM.
 
-> Some AI workloads may benefit more from caching reusable computation
-> structure than from caching final responses, when parameters vary but
-> structure doesn't.
+**Status: a controlled investigation, not a product, and not a new technique.** Plan caching and structured-intent caching already exist. See [Prior art](#prior-art). The question here was when this approach beats the alternatives and where it breaks.
 
-Tested via eight falsifiable sub-hypotheses (H1–H8) — see
-`docs/hypotheses.md` for each one's actual outcome against this repo's
-own experiment.
+## What the experiments found
 
-## Architecture
+All numbers below come from [docs/experiment-log.md](docs/experiment-log.md), entries EXP-015 to EXP-017. Each can be reproduced with [scripts/reproduce.sh](scripts/reproduce.sh).
 
-Four conditions run over the same workload with the same LLM backend
-(full detail: `docs/architecture.md`):
+### 1. Against a fair baseline, the main gain is latency, not accuracy
 
-```
-A. No cache          Request -> LLM -> Answer
-B. Exact cache        Request -> exact match? -> cached answer : (LLM -> store)
-C. Semantic cache      Request -> embed -> nearest neighbor above threshold?
-                              -> cached answer : (LLM -> store)
-D. Computation cache   Request -> identify task -> retrieve computation
-                              -> extract + bind parameters -> validate
-                              -> valid? execute directly : fall back to LLM
-```
+Same 150 requests, same local Llama 3 8B model via Ollama, temperature 0.
 
-Scope: **Level 1 (deterministic arithmetic) and Level 2 (parameterized
-business formulas) only** — closed-form, deterministic tasks, which is
-what makes "reuse the procedure, rebind fresh parameters, execute
-directly" a coherent design. Level 3 (database-backed workflows) and
-Level 4 (agent workflows) need a different computation representation
-and are explicitly out of scope for this prototype — see
-`docs/architecture.md`'s scope note.
+| System | Correct | Median latency | Requests that called the LLM |
+|---|---|---|---|
+| LLM answers directly | 71/150 (47%) | 1.1 s | 100% |
+| LLM answers with a step-by-step prompt | 71/150 (47%) | 2.5 s | 100% |
+| **LLM picks the tool and parameters, code does the math** (the fair baseline) | 139/150 (93%) | 1.2 s | 100% |
+| Computation cache, raw LLM as fallback | 131/150 (87%) | 129 ms | 23% |
+| Computation cache, the router above as fallback | 146/150 (97%) | 129 ms | 23% |
 
-## Experimental setup
+![Accuracy and latency against the fair baseline](results/figures/fig1_baselines.png)
 
-- Workload: 9 canonical tasks (`add`, `subtract`, `multiply`,
-  `percentage`, `compound_interest`, `revenue`, `discounted_price`,
-  `tax`, `margin`), each with several paraphrase templates and randomized
-  parameters. 150 requests by default, fully seeded and reproducible
-  (`workloads/generators.py`).
-- LLM backend: a **simulated** backend by default (deterministic,
-  offline, zero cost — see `aicache/llm/simulated.py` for exactly what's
-  real (token-count heuristic, published pricing) vs. synthetic (latency
-  distribution) about it), a pluggable real **Gemini** backend
-  (`aicache/llm/gemini.py`, inactive unless `GEMINI_API_KEY` is set;
-  free-tier-capped at 20 requests/day), and a pluggable real **Ollama**
-  backend (`aicache/llm/ollama.py`, fully local, no quota — used for the
-  full-scale real-model validation in EXP-008).
-- Embedding model: `redis/langcache-embed-v1` — chosen after directly
-  comparing it against a generic sentence-similarity model and finding
-  it separates genuine paraphrases from different-parameter requests far
-  more sharply (see `docs/experiment-log.md`, EXP-005, and
-  `aicache/matching/embedder.py`'s docstring).
-- **External comparison baselines**: real GPTCache and real RedisVL,
-  each run through the identical protocol as this repo's own semantic
-  cache, in their own dependency-isolated subprocesses — see
-  `docs/architecture.md`'s "External comparison baselines" section.
-  Optional: skipped gracefully if the required venv/Redis instance isn't
-  present.
-- Metrics: hit/valid-hit/invalid-hit/miss/fallback rates, correctness
-  (checked independently against ground truth, not assumed from
-  outcome), tokens, cost, latency — see `docs/evaluation.md`.
+- The 93% and 97% accuracy intervals overlap at this sample size, so the accuracy difference is not conclusive.
+- The latency gap is real: about 9x lower median, and 77% of requests needed no LLM call.
+- The 129 ms median was measured while a local model shared the same laptop. A lookup takes about 11 ms on an idle machine.
 
-Run it:
+### 2. My first cache was wrong, and I fixed it
+
+Over 10 seeds the cache made **20 wrong hits in 1,500 requests**. Requests for add, subtract and multiply share a parameter signature. The embedding match sometimes picked the wrong one, and my validation checked parameter shape only. For example, "508 + 780 = ?" was matched to subtract.
+
+A small lexical-cue guard brought this to **0 in 1,500**, at a cost of about one point of hit rate.
 
 ```
-pip install -e .
-python -m pytest tests/ -q                    # 51 tests (48 always run + 3 external, auto-skipped if unavailable)
-python -m benchmarks.run_experiment           # writes results/results.csv, results/summary.json
-python -m benchmarks.plots                    # writes results/*.png
-
-# Real-model validation (needs `ollama serve` running + a model pulled, e.g. `ollama pull llama3`):
-python -m benchmarks.run_experiment --backend ollama --skip-threshold-sweep --skip-external \
-    --output-dir results/real_backend_ollama
-python -m benchmarks.plot_real_backend
+python -m benchmarks.guard_ab    # under a minute, offline
 ```
 
-## Results
+That is encouraging, not proof of general safety. The guard was written after the failures were seen, and the evaluation uses the same workload templates. Seeds 6 to 10 were not looked at while writing it.
 
-From the run documented in full in `docs/experiment-log.md` (EXP-006;
-150 requests, seed 42, simulated LLM backend, `redis/langcache-embed-v1`
-embeddings):
+### 3. Four claims I made earlier did not survive re-testing
 
-| Baseline | Hit rate | Valid | Invalid | Correctness | Tokens | Cost (USD) |
-|---|---|---|---|---|---|---|
-| A — No cache | 0.0% | — | — | 100.0% | 2193 | 0.00338 |
-| B — Exact cache | 0.0% | 0.0% | 0.0% | 100.0% | 2193 | 0.00338 |
-| C — This repo's semantic cache (0.75) | 64.0% | 63.3% | 0.7% | 99.3% | 778 | 0.00120 |
-| **RedisVL** (real system, same embedding model) | 64.0% | 63.3% | 0.7% | 99.3% | 778 | 0.00120 |
-| **GPTCache** (real system, generic embedding model) | 88.7% | 18.0% | **70.7%** | **29.3%** | 194 | 0.00033 |
-| D — Computation cache | 77.3% | 77.3% | **0.0%** | **100.0%** | 346 | 0.00061 |
+![Four claims that changed](results/figures/fig3_corrections.png)
 
-![Hit rate split by correctness](results/hit_rate_by_baseline.png)
+### 4. A real open-source app: where the router fails silently
 
-**Two findings, not one.** First — the credibility check: this repo's
-own from-scratch semantic-cache reimplementation matches RedisVL's real,
-production implementation *within noise, at every threshold tested*.
-It isn't a strawman.
+The two risk tools from [wshobson/financial-chat](https://github.com/wshobson/financial-chat) are imported unmodified and tested with 144 positive and 20 negative requests. **The tool router in this test is a local Llama 3 8B, not the model the app itself uses.** Nothing here is a claim about how that app behaves with its own model.
 
-![Correctness vs threshold across three real systems](results/cross_system_correctness.png)
+| System | Correct (of 144) | Wrong answers executed | Median latency |
+|---|---|---|---|
+| LLM router over the real tool schemas | 133 (92%) | 10 | 1.6 s |
+| Cache, extractor v2 | 111 (77%) | 0 | 12 ms |
+| Hybrid: cache first, router on reject | 141 (98%) | 2 | 12 ms median, 385 ms mean |
 
-Second — embedding model choice turns out to matter as much as, or more
-than, caching algorithm choice: GPTCache's own out-of-the-box embedding
-default trails RedisVL/this-repo's-cache by up to 70 percentage points
-of correctness at the *identical* nominal threshold, on the *identical*
-workload, run through the *identical* protocol. The full sweep
-(`results/semantic_threshold_sweep.png`) shows this isn't fixable by
-retuning GPTCache's threshold alone within any reasonable range.
+- In the five of the router's ten wrong executions that I inspected, "0.5%" was passed as 0.005. The tool expects percent, so it returned a position size 100x too small, with no error. A clearer tool description would probably help. That was not tested.
+- The cache refused 23% of requests it could not safely bind. Refusing is safer than a plausible wrong answer, but it is not free.
+- Phrasing templates were split into calibration, development and a fresh holdout. On the holdout the cache executed 41 of 64 requests with 0 wrong.
+- Embedding similarity alone could not gate this domain. Scores for real and unrelated requests overlapped (0.46 to 0.67 against 0.37 to 0.70). A structural check did the real work: every number must bind to exactly one parameter, with none left over.
 
-**Headline finding, computation vs. response caching**: the computation
-cache reaches a *higher* hit rate (77.3%) than any of the three
-semantic-response-cache configurations at their safe operating point,
-at *zero* observed invalid hits and the lowest token/cost footprint of
-any caching condition tested (346 tokens / $0.00061, an 84% reduction
-vs. no-cache). Its 22.7% fallback rate is a deliberate, correctness-preserving
-refusal to guess, not a failure. Full numbers and interpretation:
-`docs/experiment-log.md` (EXP-004 through EXP-006). All charts
-(`tokens_and_cost_by_baseline.png`, `latency_by_baseline.png`,
-`semantic_threshold_sweep.png`, `cross_system_correctness.png`) are in
-`results/`.
+### 5. When a semantic cache is fine, and when it is not
 
-### A third finding: what a real model adds (EXP-008, real local LLM, no simulation)
+A good semantic cache stayed about 99% correct on plain arithmetic, using `redis/langcache-embed-v1` at similarity 0.75. What changed is how much traffic it could serve.
 
-Every result above uses a simulated LLM that is correct by construction
-— useful for isolating caching-algorithm behavior, but blind to one
-thing: whether the underlying model can actually do the computation.
-Re-running all four core baselines at full scale (150 requests) against
-a real local model (`llama3:8b` via Ollama, chosen specifically because
-it runs unlimited and free on this project's own hardware, after a
-Gemini API free-tier key turned out to cap at 20 requests/day) answered
-that question directly:
+![Cache usefulness against repeat rate](results/figures/fig2_repeats.png)
 
-| Baseline (real LLM, same model throughout) | Hit rate | Correctness |
+When no request repeats an earlier request's exact numbers, the semantic cache served 0% from cache and the computation cache about 75%. When numbers repeat often, the two get close. If your parameters repeat, you may not need this.
+
+### 6. Database and branching workflows
+
+Over 10 seeds, with the semantic cache at the harness default similarity of 0.65, looser than the 0.75 above:
+
+| | Computation cache | Semantic cache |
 |---|---|---|
-| A — No cache | 0.0% | **48.7%** |
-| B — Exact cache | 0.0% | 46.7% |
-| C — This repo's semantic cache | 64.0% | 54.0% |
-| D — Computation cache | 77.3% | **86.7%** |
+| Level 3, database workflows (225 requests per seed) | 100.0% correct, 1 wrong hit in 2,250 | 64.1% correct |
+| Level 4, branching workflows (180 requests per seed) | 100.0% correct, 0 wrong hits in 1,800 | 38.2% correct |
 
-![Correctness by baseline, real backend](results/real_backend_ollama/correctness_real_backend.png)
-
-Calling the model directly for every request got these questions right
-less than half the time — and 0% of the time on `compound_interest` and
-`margin` specifically (wrong on all 18 and all 12 attempts):
-
-![Real LLM accuracy by task type](results/real_backend_ollama/llm_accuracy_by_task_type.png)
-
-Because the computation cache routes 77.3% of its traffic around the
-model entirely, its correctness came out to 86.7% — using the *exact
-same* underlying LLM as the 48.7%-correct `no_cache` baseline. This is a
-different, and arguably larger, argument for computation caching than
-the stale-reuse story above: it's not just safer than semantic caching,
-it's a hedge against the model's own unreliability at deterministic
-sub-tasks — something no response-caching approach can offer, since it
-still asks the model to compute the answer on every miss. Full
-breakdown, methodology, and the (real, reported-not-hidden) limitations
-of a single un-repeated local run: `docs/experiment-log.md` EXP-008,
-and the addendum in `docs/hypotheses.md`.
+The looser threshold explains part of the semantic cache's lower score, so these are not directly comparable to section 5. Correctness under database mutation was tested in only three hand-picked scenarios (EXP-010).
 
 ## Limitations
 
-- **Single run, single seed** — no repeated-runs variance or confidence
-  intervals are reported. See `docs/evaluation.md`.
-- **Deterministic tasks only** — the computation cache's zero-invalid-hit
-  result depends entirely on Level 1/2 tasks being closed-form and
-  side-effect-free. It does not generalize to Level 3/4 without a
-  different representation.
-- **Positional parameter extraction** — a real, documented limitation
-  (`aicache/binding/extractor.py`); two template bugs exploiting exactly
-  this limitation were found and fixed during development (see
-  `docs/experiment-log.md`, EXP-002/EXP-003) — not swept under the rug.
-- **Task-identification threshold is a real, narrowed-but-not-eliminated
-  trade-off** — see H6 in `docs/hypotheses.md`: even with a strong
-  embedding model, correct- and incorrect-match similarity ranges
-  overlap slightly, and the calibrated threshold (0.52) sits inside
-  that overlap by design.
-- **External baselines are environment-dependent** — GPTCache/RedisVL
-  results require a specific local venv layout and, for RedisVL, a
-  reachable Redis instance; both are skipped gracefully (not faked) when
-  absent. See `docs/evaluation.md`.
-- **Simulated LLM backend by default** — see `aicache/llm/simulated.py`
-  for exactly what's real vs. synthetic about its numbers. Two real
-  backends are wired and working: Gemini (`aicache/llm/gemini.py`,
-  hit a hard 20 requests/day free-tier quota — see EXP-007) and Ollama
-  (`aicache/llm/ollama.py`, ran the full 150-request core comparison
-  with no quota limit — EXP-008). The real-backend runs found two real
-  bugs in this repo's own harness before they could distort results (a
-  correctness-parser bug, EXP-007; a cost-fallback bug that would have
-  mislabeled real-model costs as Claude Haiku pricing, EXP-008) — both
-  fixed and covered by tests. EXP-008's threshold sweep and external
-  (GPTCache/RedisVL) comparison weren't re-run against a real backend
-  (deliberately out of scope — see that entry); those remain validated
-  only against the simulated backend.
-- **No eviction/admission policy of any kind** — see
-  `docs/eviction-future-work.md`; explicitly deferred, not solved.
+- Templated phrasings, not real user traffic.
+- One 8B model on one laptop. A stronger model would narrow the accuracy gap.
+- The arithmetic validator still cannot catch out-of-order numbers. "Over 3 years at 5 percent, what does $1000 grow to?" binds to (3, 5, 1000) and returns 4.6e21. The benchmark never states numbers out of order, so it does not test this. The financial-chat extractor does handle order.
+- The lexical-cue guard covers add, subtract and multiply only.
+- The extractor and guard were built after seeing failures, so development-set numbers are optimistic.
+- No eviction or admission policy. See [docs/eviction-future-work.md](docs/eviction-future-work.md).
+- The 1B-model result (52 of 60 with a proper router prompt) is a small slice of 60 requests.
 
-## Level 3 and 3b: database-backed enterprise workflows
+Older entries in the experiment log (EXP-001 to EXP-014) are single-seed. Where they disagree with EXP-015 to EXP-017, trust the later entries.
 
-Extends the same "cache the plan, not the data" idea from closed-form
-arithmetic to workflows that must read live, mutable state (customer/
-transaction/policy records) before answering — full write-up:
-`docs/level3.md`. Headline: 99.1% hit rate, **0% invalid hits**, on a
-workload where semantic caching hits 35.6% invalid — and a dedicated
-freshness experiment demonstrating the mechanism directly: a database
-mutation flips the always-fresh condition's answer correctly while
-semantic caching and a deliberate stale-fetch ablation keep silently
-serving the pre-mutation answer.
+## Use it in your own workflow
 
-`docs/level3b.md` sweeps the two variables the primary comparison held
-fixed: structural locality (computation-cache hit rate/correctness stay
-flat across a 40x range of entity diversity; semantic caching's
-correctness falls *while its hit rate rises* over the same range) and
-state volatility (correctness under mutation exposure follows
-`1 − mutation_rate` precisely for both semantic caching and the stale
-ablation).
+`ComputationRouter` lets you put your own deterministic tool in front of an LLM. It is experimental and the API may change.
 
-## Level 4: branching workflows and graduated freshness
+```python
+from aicache import ComputationRouter, Slot
 
-Extends Level 3 to a branching plan (one hand-specified task,
-`return_decision`, four possible outcomes) and a mixed freshness model —
-full write-up: `docs/level4.md`. Zero changes to any shared matching or
-execution infrastructure were needed to support branching; the plan
-lives entirely inside one task's own fetch logic. Headline: 99.4% hit
-rate, **0% invalid hits**, on a workload where semantic caching hits
-60.6% invalid (worse than Level 3's 35.6% — more distinguishable
-outcomes means a collision is more likely to be substantively wrong,
-not just numerically wrong).
+router = ComputationRouter(min_similarity=0.5)
 
-The centerpiece: a graduated-freshness (TTL) sweep quantifying, for the
-first time anywhere this project's research found (`docs/differentiation.md`),
-exactly how a TTL-cached sub-fetch's correctness depends on *both* TTL
-length and how fast the underlying data changes — modeled directly on
-LangGraph's real `CachePolicy(ttl=...)` mechanism (confirmed against the
-actual library). Every TTL shorter than the re-query interval scores
-100% regardless of data volatility; every TTL at or beyond it degrades
-sharply and tracks volatility — a step-transition-then-degrade shape
-predicted before running and confirmed by the data.
+@router.task(
+    examples=["What is X percent of Y?", "Calculate X% of Y."],
+    slots=[Slot("pct", after=r"%|percent"), Slot("base", before=r"of")],
+)
+def percent_of(pct, base):
+    return base * pct / 100
 
-## Differentiation
+result = router.run("What is 15% of 240?", fallback=ask_your_llm)
+result.source   # "computation", "fallback" or "refused"
+result.value    # 36.0
+result.reason   # why it was not computed, when it was not
+```
 
-`docs/differentiation.md` — is this actually a different idea, and does
-it matter? Evidence at four levels of rigor: this repo's own controlled
-experiments (0% invalid-hit rate at every phase and every workload
-tested), a real bank's production semantic cache (documented false
-positives up to 99% zero-shot, 3.8% best-case after months of
-hardening — see `docs/prior-art.md`'s "Real-world evidence" section), a
-live, reproducible demo against the real `langgraph` library showing
-its production node-caching feature (`CachePolicy`) is architecturally
-equivalent to this repo's stale-fetch ablation, and the closest
-published academic work (Agentic Plan Caching, arXiv:2506.14852; W5H2,
-arXiv:2602.18922) — which validates the core architecture but doesn't
-rigorously measure the freshness question this repo's Level 3/3b phases
-were built to answer. Includes the honest counter-case: what's already
-been published, and where this repo's claims stop.
+What happens on each request:
+
+1. The closest registered tool is found by embedding similarity.
+2. Every number in the request must be claimed by exactly one slot, with none left over. Order in the sentence does not matter.
+3. Your function runs. If any step is unsure, or your function raises, the request goes to `fallback`. With no fallback it is refused. It is never guessed.
+
+A complete runnable example, with a position-size tool, is in [examples/position_size_router.py](examples/position_size_router.py):
+
+```bash
+python examples/position_size_router.py
+```
+
+Before you trust it on real traffic:
+
+- **Calibrate on your own requests.** `router.identify(text)` returns the best task and its similarity. Run it on real requests and on unrelated ones to pick `min_similarity`. In the finance test, similarity alone could not separate the two. The slot check did the real rejecting.
+- **Measure wrong executions.** Count how often it computes a wrong answer on your traffic. [benchmarks/real_app/financial_chat_integration.py](benchmarks/real_app/financial_chat_integration.py) shows the pattern, with a calibration set, held-out phrasings and negative requests.
+- **Use `cues` when two tools take the same parameters.** Add and subtract both take two numbers, and the embedding match confused them. `add_task(..., cues=[r"\bplus\b|\+"])` requires an operator word for that tool.
+- **Keep units explicit.** A slot gives you the number as written. Use `transform` only when your tool expects something else.
+
+It is a poor fit for tools with side effects, tools that depend on context outside the request text, or answers that need judgment.
+
+## Reproduce it
+
+Python 3.10 or newer. The first run downloads the embedding model from Hugging Face.
+
+```bash
+pip install -e ".[dev]"
+
+bash scripts/reproduce.sh quick       # 142 tests + the wrong-hit guard comparison, about 5 minutes, offline
+bash scripts/reproduce.sh sweep       # repeat-rate sweep and figure 2, about 15 minutes, offline
+bash scripts/reproduce.sh realmodel   # fair-baseline comparison, needs Ollama and llama3
+bash scripts/reproduce.sh realapp     # financial-chat integration, needs Ollama, llama3 and network
+```
+
+Everything writes to `out/` and never overwrites the committed `results/`.
+
+For the two real-model steps:
+
+```bash
+ollama serve &
+ollama pull llama3
+```
+
+Latency numbers depend on your hardware and on whatever else is using it. Expect the same ordering, not the same milliseconds. Model sampling is pinned (temperature 0, fixed seed), but a different Ollama or model build can still change individual answers.
+
+| Claim | How to check |
+|---|---|
+| 20 wrong hits in 1,500 without the guard, 0 with it | `python -m benchmarks.guard_ab` |
+| Fair-baseline accuracy and latency | `bash scripts/reproduce.sh realmodel`, committed copy in `results/real_baselines/` |
+| Financial-chat comparison | `bash scripts/reproduce.sh realapp`, committed copy in `results/real_app_financial_chat.json` |
+| Repeat-rate sweep | `bash scripts/reproduce.sh sweep`, raw summaries in `results/sweeps/repetition/` |
+| Level 3 and 4 across 10 seeds | raw summaries in `results/sweeps/level34/`, protocol in EXP-017 |
+| Figures | `python -m benchmarks.plot_linkedin --rep-dir results/sweeps/repetition --out out/figures` |
+
+`results/real_baselines_preguard/` holds the same real-model run from before the guard was added, kept for comparison.
+
+## How it works
+
+Four conditions run over the same workload and the same backend:
+
+```
+A. No cache          Request -> LLM -> Answer
+B. Exact cache       Request -> exact match? -> cached answer : (LLM -> store)
+C. Semantic cache    Request -> embed -> nearest neighbor above threshold?
+                            -> cached answer : (LLM -> store)
+D. Computation cache Request -> identify task -> extract + bind parameters
+                            -> validate -> valid? execute directly : fall back to LLM
+```
+
+The workload has 9 task types (add, subtract, multiply, percentage, compound interest, revenue, discounted price, tax, margin), seeded paraphrase templates and randomized parameters. Levels 3 and 4 add database-backed and branching workflows. Architecture detail: [docs/architecture.md](docs/architecture.md).
+
+Backends: a deterministic simulated model (the default, offline), local Ollama, and Gemini. External baselines are real GPTCache and real RedisVL, each in its own isolated subprocess. They are optional and skipped when unavailable.
 
 ## Prior art
 
-`docs/prior-art.md` — Redis LangCache, **RedisVL and GPTCache (both
-directly benchmarked, not just described)**, LangGraph `CachePolicy`
-(directly exercised against the real library), CrewAI, AutoGen, vLLM
-prefix caching, LMCache, **Agentic Plan Caching and W5H2 (real,
-specific papers, not a research-direction placeholder)**, Google
-PARROT, TinyLFU/W-TinyLFU, CacheLib, and a real banking semantic-cache
-production case study, all mapped against this repo's own design
-choices. Nothing in this repo claims to invent computation caching,
-semantic caching, or cost-aware eviction.
+Nothing here claims to invent computation caching, semantic caching or plan caching. The full map of 17 systems is in [docs/prior-art.md](docs/prior-art.md). The closest published work:
 
-## Future work
+- Zhang, Wornow, Wan, Olukotun, [Agentic Plan Caching: Test-Time Memory for Fast and Cost-Efficient LLM Agents](https://arxiv.org/abs/2506.14852). Caches reusable plan templates. Reported figures in the current abstract: 50.31% lower cost, 27.28% lower latency.
+- Basu, [Why Agent Caching Fails and How to Fix It: Structured Intent Canonicalization with Few-Shot Learning](https://arxiv.org/abs/2602.18922). Splits a request into a cache key plus separately injected parameters.
+- Daivam, [Reducing False Positives in RAG Semantic Caching: a Banking Case Study](https://www.infoq.com/articles/reducing-false-positives-retrieval-augmented-generation/), InfoQ, November 2025. A production semantic cache matched "I don't want this card anymore" to investment account closure at 88.7% confidence.
 
-Levels 1-4 (above) are done, not future work. What's left: general
-agentic graphs (dynamic plan generation, cycles, an LLM choosing which
-branch to take — explicitly out of scope for Level 4, see
-`docs/level4.md`'s closing section), running the real `langgraph`
-library itself through this repo's full benchmark harness (Level 4's
-TTL sweep reimplements its confirmed mechanism rather than driving the
-library directly — see `docs/differentiation.md` §7), and
-`docs/eviction-future-work.md` (admission/eviction at real scale). See
-also the "Next experiments" notes throughout `docs/experiment-log.md`.
+What this repo adds is a controlled comparison of one combination, identify then bind then validate then fall back, against exact and semantic caching, with the failures reported.
 
 ## Repository layout
 
 ```
-ai-computation-cache/
-├── docs/                problem, prior-art, architecture, hypotheses,
-│                        evaluation, eviction-future-work, experiment-log,
-│                        level3, level3b, level4, differentiation
-├── src/aicache/         the library: cache/ (incl. ttl_cache.py),
-│                        matching/, computation/ (incl. graph_tasks.py),
-│                        binding/, validation/, metrics/, llm/, enterprise/
-├── workloads/           Level 1/2 workload generator + templates;
-│                        level3/ (enterprise workflow), level4/ (branching)
-├── benchmarks/          baselines.py, run_experiment.py, plots.py,
-│                        plot_real_backend.py, external/ (real GPTCache +
-│                        RedisVL adapters), level3/ (baselines,
-│                        freshness/locality/volatility experiments),
-│                        level4/ (baselines, TTL sweep)
-├── tests/                118 unit + integration tests
-├── results/             results.csv, summary.json, generated charts
-│                        (simulated-backend, EXP-006 headline numbers)
-│   ├── real_backend_ollama/  real-model validation, EXP-008
-│   ├── level3/           Level 3/3b results, sweeps, and charts
-│   └── level4/           Level 4 results and TTL sweep
-└── configs/             (reserved for future experiment configs)
+docs/         problem, prior art, architecture, hypotheses, evaluation,
+              level3, level3b, level4, differentiation, experiment-log
+src/aicache/  the library: router.py (public API), cache/, matching/,
+              computation/, binding/, validation/, metrics/, llm/, enterprise/
+workloads/    workload generators and templates for levels 1 to 4
+benchmarks/   run_experiment.py, real_baselines.py, guard_ab.py,
+              real_app/ (financial-chat), level3/, level4/, external/
+tests/        142 unit and integration tests
+examples/     a runnable position-size router example
+results/      committed raw results and figures
+scripts/      reproduce.sh
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).

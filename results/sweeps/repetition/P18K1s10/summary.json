@@ -1,0 +1,92 @@
+{
+  "computation_cache": {
+    "baseline": "computation_cache",
+    "request_count": 162,
+    "hit_rate": 0.7345679012345679,
+    "valid_hit_rate": 0.7345679012345679,
+    "invalid_hit_rate": 0.0,
+    "miss_rate": 0.0,
+    "fallback_rate": 0.2654320987654321,
+    "llm_call_rate": 0.2654320987654321,
+    "correctness_rate": 1.0,
+    "total_input_tokens": 346,
+    "total_output_tokens": 81,
+    "total_tokens": 427,
+    "total_cost_usd": 0.0007509999999999999,
+    "avg_cost_usd": 4.635802469135802e-06,
+    "p50_latency_ms": 10.212020482867956,
+    "p95_latency_ms": 300.34772266511294,
+    "p99_latency_ms": 448.60563397475454,
+    "outcome_counts": {
+      "hit_valid": 119,
+      "fallback": 43
+    }
+  },
+  "exact_cache": {
+    "baseline": "exact_cache",
+    "request_count": 162,
+    "hit_rate": 0.0,
+    "valid_hit_rate": 0.0,
+    "invalid_hit_rate": 0.0,
+    "miss_rate": 1.0,
+    "fallback_rate": 0.0,
+    "llm_call_rate": 1.0,
+    "correctness_rate": 1.0,
+    "total_input_tokens": 2126,
+    "total_output_tokens": 323,
+    "total_tokens": 2449,
+    "total_cost_usd": 0.003741,
+    "avg_cost_usd": 2.3092592592592593e-05,
+    "p50_latency_ms": 206.9324357918524,
+    "p95_latency_ms": 415.0142212042141,
+    "p99_latency_ms": 510.877521292144,
+    "outcome_counts": {
+      "miss": 162
+    }
+  },
+  "no_cache": {
+    "baseline": "no_cache",
+    "request_count": 162,
+    "hit_rate": 0.0,
+    "valid_hit_rate": 0.0,
+    "invalid_hit_rate": 0.0,
+    "miss_rate": 1.0,
+    "fallback_rate": 0.0,
+    "llm_call_rate": 1.0,
+    "correctness_rate": 1.0,
+    "total_input_tokens": 2126,
+    "total_output_tokens": 323,
+    "total_tokens": 2449,
+    "total_cost_usd": 0.003741,
+    "avg_cost_usd": 2.3092592592592593e-05,
+    "p50_latency_ms": 206.93064439288014,
+    "p95_latency_ms": 415.01272545359313,
+    "p99_latency_ms": 510.87552373560663,
+    "outcome_counts": {
+      "no_cache": 162
+    }
+  },
+  "semantic_cache": {
+    "baseline": "semantic_cache",
+    "request_count": 162,
+    "hit_rate": 0.006172839506172839,
+    "valid_hit_rate": 0.0,
+    "invalid_hit_rate": 0.006172839506172839,
+    "miss_rate": 0.9938271604938271,
+    "fallback_rate": 0.0,
+    "llm_call_rate": 0.9938271604938271,
+    "correctness_rate": 0.9938271604938271,
+    "total_input_tokens": 2108,
+    "total_output_tokens": 321,
+    "total_tokens": 2429,
+    "total_cost_usd": 0.003713,
+    "avg_cost_usd": 2.2919753086419755e-05,
+    "p50_latency_ms": 218.6997601837574,
+    "p95_latency_ms": 426.2981756466928,
+    "p99_latency_ms": 521.4240655748412,
+    "outcome_counts": {
+      "miss": 161,
+      "hit_invalid": 1
+    }
+  }
+}

@@ -1,5 +1,14 @@
 # Level 3b: Structural Locality and State Volatility Sweeps
 
+> **Update 2026-10-20.** Most results in this file were measured at a single seed.
+> A later multi-seed rerun changed some of them. The computation cache is not
+> literally 0% invalid: it made 20 wrong hits in 1500 Level 1/2 requests over 10
+> seeds (fixed by a guard, EXP-016) and 1 wrong hit in 2250 Level 3 requests
+> (EXP-017). Read "0% invalid" or "100% correct" below as "zero at the seed
+> measured". Comparisons against a raw, unscaffolded LLM used a weak baseline;
+> EXP-015 has the fair one. Details: [experiment-log.md](experiment-log.md),
+> EXP-015 to EXP-017.
+
 ## Motivation
 
 `docs/level3.md`'s primary comparison (EXP-009) reported a 99.1%
