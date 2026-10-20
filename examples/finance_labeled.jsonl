@@ -1,0 +1,131 @@
+{"text": "Calculate the 5R profit target for AMD, entry $418.24, stop $398.51", "expect": 516.89}
+{"text": "Calculate the 3R profit target for AMD, entry $253.61, stop $233.44", "expect": 314.12}
+{"text": "Calculate the 3R profit target for NFLX, entry $238.85, stop $220.62", "expect": 293.54}
+{"text": "Calculate the 2R profit target for TSLA, entry $225.43, stop $195.45", "expect": 285.39}
+{"text": "I'm buying SHOP at $471.81 with a stop at $455.66. Where is my 3R target?", "expect": 520.26}
+{"text": "I'm buying SHOP at $26.9 with a stop at $24.57. Where is my 2R target?", "expect": 31.56}
+{"text": "I'm buying AAPL at $107.5 with a stop at $94.5. Where is my 2R target?", "expect": 133.5}
+{"text": "I'm buying AMD at $170.09 with a stop at $156.64. Where is my 3R target?", "expect": 210.44}
+{"text": "What are the R multiple targets for NFLX if I enter at 127.48 and my stop loss is 112.86? Use a 2R multiple.", "expect": 156.72}
+{"text": "What are the R multiple targets for TSLA if I enter at 230.37 and my stop loss is 203.5? Use a 2R multiple.", "expect": 284.11}
+{"text": "What are the R multiple targets for AMZN if I enter at 165.03 and my stop loss is 144.82? Use a 4R multiple.", "expect": 245.87}
+{"text": "What are the R multiple targets for AAPL if I enter at 52.3 and my stop loss is 49.26? Use a 5R multiple.", "expect": 67.5}
+{"text": "How many shares of TSLA should I buy with a $75000 account risking 1.5% per trade? Entry $314.13, stop $304.45.", "expect": 116.22}
+{"text": "How many shares of GOOGL should I buy with a $75000 account risking 2% per trade? Entry $449.76, stop $419.76.", "expect": 50.0}
+{"text": "How many shares of AMD should I buy with a $500000 account risking 3% per trade? Entry $405.65, stop $348.88.", "expect": 264.22}
+{"text": "How many shares of AAPL should I buy with a $10000 account risking 1% per trade? Entry $162.71, stop $140.02.", "expect": 4.41}
+{"text": "Position size for TSLA: account $75000, risk 1.5%, entry 248.74, stop 229.77.", "expect": 59.3}
+{"text": "Position size for AAPL: account $100000, risk 1%, entry 189.26, stop 164.12.", "expect": 39.78}
+{"text": "Position size for NFLX: account $250000, risk 2%, entry 98.02, stop 93.97.", "expect": 1234.57}
+{"text": "Position size for AMD: account $250000, risk 1.5%, entry 430.19, stop 382.54.", "expect": 78.7}
+{"text": "I have $500000 and want to risk 1% on MSFT. I'd enter at $311.72 with a stop at $295.03, what size?", "expect": 299.58}
+{"text": "I have $50000 and want to risk 1% on MSFT. I'd enter at $196.83 with a stop at $181.08, what size?", "expect": 31.75}
+{"text": "I have $500000 and want to risk 0.5% on NVDA. I'd enter at $81.89 with a stop at $73.05, what size?", "expect": 282.81}
+{"text": "I have $25000 and want to risk 0.5% on TSLA. I'd enter at $457 with a stop at $403.63, what size?", "expect": 2.34}
+{"text": "What is the news sentiment on AAPL this week?", "expect": "refuse"}
+{"text": "Show me a price chart for TSLA over the last year.", "expect": "refuse"}
+{"text": "Which stocks are the top gainers today?", "expect": "refuse"}
+{"text": "What does an R multiple mean in trading?", "expect": "refuse"}
+{"text": "Explain what position sizing is.", "expect": "refuse"}
+{"text": "Is NVDA overvalued right now?", "expect": "refuse"}
+{"text": "What is the 50-day moving average for MSFT?", "expect": "refuse"}
+{"text": "Tell me about the company behind AMZN.", "expect": "refuse"}
+{"text": "Give me the RSI for AMD.", "expect": "refuse"}
+{"text": "What's the relative strength of META against the S&P 500?", "expect": "refuse"}
+{"text": "Hello, what can you do?", "expect": "refuse"}
+{"text": "Why do traders use stop losses?", "expect": "refuse"}
+{"text": "My account is $50,000, which sectors look strong?", "expect": "refuse"}
+{"text": "TSLA is trading at 250, is that a good level?", "expect": "refuse"}
+{"text": "What are the top losers today?", "expect": "refuse"}
+{"text": "Give me a 2:1 reward-to-risk profit target on TSLA: in at 409.43, out at 367.01 if wrong.", "expect": 494.27}
+{"text": "Give me a 2:1 reward-to-risk profit target on AAPL: in at 118.21, out at 113.63 if wrong.", "expect": 127.37}
+{"text": "Give me a 5:1 reward-to-risk profit target on AMD: in at 192.71, out at 180.2 if wrong.", "expect": 255.26}
+{"text": "Give me a 4:1 reward-to-risk profit target on TSLA: in at 280.47, out at 245.08 if wrong.", "expect": 422.03}
+{"text": "META trade idea, stop 53.47, entry 60.09. Compute the 5R take-profit.", "expect": 93.19}
+{"text": "TSLA trade idea, stop 76.57, entry 81.91. Compute the 2R take-profit.", "expect": 92.59}
+{"text": "AAPL trade idea, stop 212.45, entry 233.87. Compute the 3R take-profit.", "expect": 298.13}
+{"text": "AMD trade idea, stop 246.01, entry 254.08. Compute the 3R take-profit.", "expect": 278.29}
+{"text": "Using a stop price of $273.11 and an entry price of $316.11 on GOOGL, what's the profit target at 5 times my risk?", "expect": 531.11}
+{"text": "Using a stop price of $19.28 and an entry price of $20.22 on MSFT, what's the profit target at 4 times my risk?", "expect": 23.98}
+{"text": "Using a stop price of $104.92 and an entry price of $116.93 on AAPL, what's the profit target at 2 times my risk?", "expect": 140.95}
+{"text": "Using a stop price of $415.97 and an entry price of $475.08 on AAPL, what's the profit target at 4 times my risk?", "expect": 711.52}
+{"text": "how far is a 4R target on AAPL when I get in at 375.44 and bail at 333.94", "expect": 541.44}
+{"text": "how far is a 3R target on GOOGL when I get in at 53.76 and bail at 46.28", "expect": 76.2}
+{"text": "how far is a 5R target on AAPL when I get in at 296.59 and bail at 265.33", "expect": 452.89}
+{"text": "how far is a 3R target on NVDA when I get in at 461.2 and bail at 418.79", "expect": 588.43}
+{"text": "R-multiple calc: ticker GOOGL, entry 104.1, stop 90.41, multiple 3", "expect": 145.17}
+{"text": "R-multiple calc: ticker SHOP, entry 134.77, stop 117.62, multiple 3", "expect": 186.22}
+{"text": "R-multiple calc: ticker GOOGL, entry 425.81, stop 392.78, multiple 5", "expect": 590.96}
+{"text": "R-multiple calc: ticker AAPL, entry 67.77, stop 57.92, multiple 4", "expect": 107.17}
+{"text": "If I go long MSFT at 360.32 and my stop sits at 323.2, what does a 5R exit look like?", "expect": 545.92}
+{"text": "If I go long SHOP at 245.86 and my stop sits at 224.32, what does a 2R exit look like?", "expect": 288.94}
+{"text": "If I go long NVDA at 125.06 and my stop sits at 114.7, what does a 2R exit look like?", "expect": 145.78}
+{"text": "If I go long AMZN at 117.7 and my stop sits at 112.97, what does a 2R exit look like?", "expect": 127.16}
+{"text": "TSLA: buy 143.83, stop-loss 129.95. I want the 2R level.", "expect": 171.59}
+{"text": "AAPL: buy 101.08, stop-loss 90.39. I want the 3R level.", "expect": 133.15}
+{"text": "TSLA: buy 186.59, stop-loss 178.55. I want the 4R level.", "expect": 218.75}
+{"text": "NFLX: buy 288.84, stop-loss 250.38. I want the 2R level.", "expect": 365.76}
+{"text": "Can you work out my target for a 4 to 1 payoff on AAPL? Entry is 238.4 and I'd stop out at 212.87.", "expect": 340.52}
+{"text": "Can you work out my target for a 5 to 1 payoff on AAPL? Entry is 29.78 and I'd stop out at 27.59.", "expect": 40.73}
+{"text": "Can you work out my target for a 2 to 1 payoff on TSLA? Entry is 356.03 and I'd stop out at 316.25.", "expect": 435.59}
+{"text": "Can you work out my target for a 2 to 1 payoff on TSLA? Entry is 228.42 and I'd stop out at 204.24.", "expect": 276.78}
+{"text": "stop 369.43, entry 384.9, NVDA, 4R please", "expect": 446.78}
+{"text": "stop 321.13, entry 335.17, TSLA, 5R please", "expect": 405.37}
+{"text": "stop 383.3, entry 417.2, AAPL, 5R please", "expect": 586.7}
+{"text": "stop 265.87, entry 288.03, GOOGL, 2R please", "expect": 332.35}
+{"text": "With a 2% risk limit on a $500000 portfolio, how many AMD shares can I take if I buy at 236.82 and stop out at 227.6?", "expect": 1084.6}
+{"text": "With a 3% risk limit on a $50000 portfolio, how many GOOGL shares can I take if I buy at 307.84 and stop out at 279.91?", "expect": 53.71}
+{"text": "With a 3% risk limit on a $50000 portfolio, how many AMD shares can I take if I buy at 167.36 and stop out at 158.9?", "expect": 177.3}
+{"text": "With a 1.5% risk limit on a $50000 portfolio, how many AAPL shares can I take if I buy at 332 and stop out at 293.4?", "expect": 19.43}
+{"text": "Size my SHOP trade: stop 24.94, entry 28.79, risking 1 percent of $75000.", "expect": 194.81}
+{"text": "Size my AAPL trade: stop 329.72, entry 373.84, risking 1 percent of $500000.", "expect": 113.33}
+{"text": "Size my AAPL trade: stop 408.29, entry 472.65, risking 3 percent of $10000.", "expect": 4.66}
+{"text": "Size my META trade: stop 429.61, entry 460.89, risking 2 percent of $25000.", "expect": 15.98}
+{"text": "Entry price $102.2, stop price $87, AMZN. Account size is $75000; risk percent 3. Shares?", "expect": 148.03}
+{"text": "Entry price $102.39, stop price $90.38, AAPL. Account size is $50000; risk percent 3. Shares?", "expect": 124.9}
+{"text": "Entry price $250.19, stop price $242.59, NFLX. Account size is $25000; risk percent 2. Shares?", "expect": 65.79}
+{"text": "Entry price $60.12, stop price $57.83, MSFT. Account size is $250000; risk percent 2. Shares?", "expect": 2183.41}
+{"text": "how big should my NVDA position be? 10000 account, 2% risk, buy 227.23, stop 198.51", "expect": 6.96}
+{"text": "how big should my NFLX position be? 500000 account, 1.5% risk, buy 281.65, stop 269.12", "expect": 598.56}
+{"text": "how big should my AMD position be? 10000 account, 0.5% risk, buy 170.17, stop 164.7", "expect": 9.14}
+{"text": "how big should my MSFT position be? 10000 account, 1.5% risk, buy 131.45, stop 117.89", "expect": 11.06}
+{"text": "Given a $50000 account and a risk of 0.5% of it, determine the share count for NFLX, in at 469.3, protective stop at 451.41.", "expect": 13.97}
+{"text": "Given a $50000 account and a risk of 3% of it, determine the share count for META, in at 252.17, protective stop at 215.47.", "expect": 40.87}
+{"text": "Given a $10000 account and a risk of 1% of it, determine the share count for GOOGL, in at 373.39, protective stop at 339.22.", "expect": 2.93}
+{"text": "Given a $100000 account and a risk of 1.5% of it, determine the share count for TSLA, in at 217.31, protective stop at 185.63.", "expect": 47.35}
+{"text": "I'm risking 3% of my $250000 account on NVDA. Buy at 236.46, stop at 229.36. How many shares?", "expect": 1056.34}
+{"text": "I'm risking 0.5% of my $250000 account on AMD. Buy at 455.04, stop at 413.68. How many shares?", "expect": 30.22}
+{"text": "I'm risking 3% of my $500000 account on MSFT. Buy at 222.13, stop at 203.7. How many shares?", "expect": 813.89}
+{"text": "I'm risking 1.5% of my $100000 account on NVDA. Buy at 260.48, stop at 247.78. How many shares?", "expect": 118.11}
+{"text": "AMZN position sizing: $500000 account, 3 percent risk, entry $328.8, stop $317.15", "expect": 1287.55}
+{"text": "MSFT position sizing: $100000 account, 3 percent risk, entry $160.05, stop $138.75", "expect": 140.85}
+{"text": "AMZN position sizing: $100000 account, 0.5 percent risk, entry $283.57, stop $247.87", "expect": 14.01}
+{"text": "NFLX position sizing: $100000 account, 0.5 percent risk, entry $22.27, stop $19.94", "expect": 214.59}
+{"text": "My stop on NFLX is 404.54 and I'm getting in at 441.98; with 100000 in the account and 0.5% risk, what's the size?", "expect": 13.35}
+{"text": "My stop on AMD is 54.71 and I'm getting in at 62.88; with 100000 in the account and 2% risk, what's the size?", "expect": 244.8}
+{"text": "My stop on GOOGL is 419.63 and I'm getting in at 443.56; with 75000 in the account and 1.5% risk, what's the size?", "expect": 47.01}
+{"text": "My stop on MSFT is 205.62 and I'm getting in at 237.65; with 75000 in the account and 2% risk, what's the size?", "expect": 46.83}
+{"text": "how many NFLX shares if account size = 100000, risk percent = 0.5, entry price = 165.92, stop price = 144.84", "expect": 23.72}
+{"text": "how many AMZN shares if account size = 10000, risk percent = 0.5, entry price = 79.55, stop price = 75.06", "expect": 11.14}
+{"text": "how many MSFT shares if account size = 50000, risk percent = 1.5, entry price = 91.54, stop price = 77.94", "expect": 55.15}
+{"text": "how many META shares if account size = 75000, risk percent = 3, entry price = 132.45, stop price = 120.51", "expect": 188.44}
+{"text": "What are analysts saying about GOOGL?", "expect": "refuse"}
+{"text": "Plot NFLX against its 200-day average.", "expect": "refuse"}
+{"text": "Define risk percent in portfolio management.", "expect": "refuse"}
+{"text": "What was the 52 week high for SHOP?", "expect": "refuse"}
+{"text": "Should I hold AMD through earnings?", "expect": "refuse"}
+{"text": "How do R multiples relate to expectancy?", "expect": "refuse"}
+{"text": "Compare AAPL and MSFT fundamentals.", "expect": "refuse"}
+{"text": "I have $25,000 to invest, any ideas?", "expect": "refuse"}
+{"text": "What is a good risk to reward ratio?", "expect": "refuse"}
+{"text": "NVDA gapped up at 480, what does that mean?", "expect": "refuse"}
+{"text": "Which stocks have the strongest momentum?", "expect": "refuse"}
+{"text": "Can you explain how stop losses get hunted?", "expect": "refuse"}
+{"text": "Summarize the latest TSLA earnings call.", "expect": "refuse"}
+{"text": "What's the support and resistance for META?", "expect": "refuse"}
+{"text": "Is a 2% risk per trade too aggressive in general?", "expect": "refuse"}
+{"text": "Who is the CEO of AMZN?", "expect": "refuse"}
+{"text": "What happened to the market today?", "expect": "refuse"}
+{"text": "List the biggest losers in tech.", "expect": "refuse"}
+{"text": "Teach me about technical analysis.", "expect": "refuse"}
+{"text": "How much is 3 times 7?", "expect": "refuse"}

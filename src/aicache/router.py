@@ -18,7 +18,9 @@ docs/experiment-log.md (EXP-015 to EXP-017):
 * A task is only as safe as its slots. Measure wrong executions on your own
   requests before trusting it. Nothing here transfers automatically.
 
-Experimental: the API may change.
+Rollout modes per task: ``active`` computes and answers, ``shadow`` computes
+but still lets the LLM answer and records whether they agree, ``off`` ignores
+the task.
 
 Example::
 
@@ -38,16 +40,24 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import re
+import threading
+import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Sequence
+from typing import Any, Awaitable, Callable, Sequence
 
 import numpy as np
 
-from .matching.embedder import Embedder
+from .binding.extractor import extract_numbers
+from .embedders import EmbedderLike, SentenceTransformerEmbedder
+from .telemetry import Telemetry
 
 MAX_GAP = 25  # characters allowed between a keyword and the number it labels
+MODES = ("active", "shadow", "off")
 _TOKEN_RE = re.compile(r"(?P<ratio>\d+)\s*:\s*1\b|\$?(?P<num>\d[\d,]*(?:\.\d+)?)")
+_FIELD_RE = re.compile(r"\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?::(?P<spec>[^{}]*))?\}")
 
 
 @dataclass(frozen=True)
@@ -88,6 +98,11 @@ class Result:
     similarity: float = -1.0
     args: dict | None = None
     reason: str = ""  # why the request was not computed, when it was not
+    text: str | None = None  # the computed value rendered with the task's format
+    request_id: str = ""
+    latency_ms: float = 0.0
+    shadow_value: Any = None  # shadow mode: what the tool computed
+    shadow_agrees: bool | None = None  # shadow mode: did the LLM answer match?
 
 
 @dataclass
@@ -157,6 +172,21 @@ def bind_slots(text: str, slots: Sequence[Slot], text_slots: Sequence[TextSlot] 
     return BindResult(True, values)
 
 
+def render_format(fmt: str, value: Any, args: dict) -> str:
+    """Fill ``{value}``, ``{value:.2f}`` and ``{slot_name}`` in a template. Only
+    these simple fields are supported, never attribute access, so a template
+    cannot reach into objects."""
+    scope = {"value": value, **args}
+
+    def sub(m: re.Match) -> str:
+        name = m.group("name")
+        if name not in scope:
+            raise ValueError(f"unknown field {{{name}}} in format {fmt!r}")
+        return format(scope[name], m.group("spec") or "")
+
+    return _FIELD_RE.sub(sub, fmt)
+
+
 @dataclass
 class _Task:
     name: str
@@ -165,15 +195,25 @@ class _Task:
     slots: list[Slot]
     text_slots: list[TextSlot]
     cues: list[str]
+    description: str = ""
+    mode: str = "active"
+    min_similarity: float | None = None
+    format: str = "{value}"
 
 
 class ComputationRouter:
-    def __init__(self, embedder: Embedder | None = None, min_similarity: float = 0.5) -> None:
-        self.embedder = embedder or Embedder()
+    def __init__(self, embedder: EmbedderLike | None = None, min_similarity: float = 0.5,
+                 telemetry: Telemetry | None = None, ambiguity_margin: float = 0.03) -> None:
+        self.embedder: EmbedderLike = embedder or SentenceTransformerEmbedder()
         self.min_similarity = min_similarity
+        # If two tools both bind within this similarity of each other and give
+        # different answers, refuse instead of picking one.
+        self.ambiguity_margin = ambiguity_margin
+        self.telemetry = telemetry or Telemetry()
         self._tasks: dict[str, _Task] = {}
         self._index: np.ndarray | None = None
         self._index_owner: list[str] = []
+        self._lock = threading.RLock()
 
     # ---- registration -------------------------------------------------
     def add_task(
@@ -185,66 +225,194 @@ class ComputationRouter:
         slots: Sequence[Slot],
         text_slots: Sequence[TextSlot] = (),
         cues: Sequence[str] = (),
+        description: str = "",
+        mode: str = "active",
+        min_similarity: float | None = None,
+        format: str = "{value}",
     ) -> None:
         """``cues`` are optional regexes; if given, a request must match at
         least one. Use them when two tools take the same parameters and differ
         only by operation (add / subtract), where embeddings can confuse them."""
         if not examples:
             raise ValueError("give at least one example phrasing")
-        self._tasks[name] = _Task(name, fn, list(examples), list(slots), list(text_slots), list(cues))
-        self._index = None
+        if mode not in MODES:
+            raise ValueError(f"mode must be one of {MODES}")
+        names = [s.name for s in slots] + [t.name for t in text_slots]
+        if len(set(names)) != len(names):
+            raise ValueError(f"task {name!r} has duplicate parameter names")
+        for fld in _FIELD_RE.finditer(format):
+            if fld.group("name") != "value" and fld.group("name") not in names:
+                raise ValueError(f"format refers to unknown field {{{fld.group('name')}}}")
+        with self._lock:
+            self._tasks[name] = _Task(name, fn, list(examples), list(slots), list(text_slots),
+                                      list(cues), description, mode, min_similarity, format)
+            self._index = None
 
     def task(self, *, examples: Sequence[str], slots: Sequence[Slot],
-             text_slots: Sequence[TextSlot] = (), cues: Sequence[str] = (), name: str | None = None):
+             text_slots: Sequence[TextSlot] = (), cues: Sequence[str] = (),
+             name: str | None = None, **kwargs: Any):
         def deco(fn):
             self.add_task(name or fn.__name__, fn, examples=examples, slots=slots,
-                          text_slots=text_slots, cues=cues)
+                          text_slots=text_slots, cues=cues, **kwargs)
             return fn
         return deco
+
+    def set_mode(self, name: str, mode: str) -> None:
+        if mode not in MODES:
+            raise ValueError(f"mode must be one of {MODES}")
+        with self._lock:
+            self._tasks[name].mode = mode
+            self._index = None
+
+    @property
+    def tasks(self) -> dict[str, _Task]:
+        return dict(self._tasks)
 
     # ---- identification -----------------------------------------------
     def _build(self) -> None:
         texts, owners = [], []
         for t in self._tasks.values():
+            if t.mode == "off":
+                continue
             for ex in t.examples:
                 texts.append(ex)
                 owners.append(t.name)
-        self._index = self.embedder.encode(texts)
+        self._index = self.embedder.encode(texts) if texts else np.zeros((0, 1))
         self._index_owner = owners
+
+    def rank(self, text: str) -> list[tuple[str, float]]:
+        """Every active task with its best example similarity, closest first."""
+        with self._lock:
+            if self._index is None:
+                self._build()
+            index, owners = self._index, self._index_owner
+        if index is None or index.shape[0] == 0:
+            return []
+        sims = index @ self.embedder.encode_one(text)
+        best: dict[str, float] = {}
+        for owner, s in zip(owners, sims):
+            if s > best.get(owner, -2.0):
+                best[owner] = float(s)
+        return sorted(best.items(), key=lambda kv: -kv[1])
 
     def identify(self, text: str) -> tuple[str | None, float]:
         """Closest task and its similarity, ignoring ``min_similarity``. Use
         this to calibrate the threshold on your own positive and negative requests."""
-        if not self._tasks:
-            return None, -1.0
-        if self._index is None:
-            self._build()
-        sims = self._index @ self.embedder.encode_one(text)  # type: ignore[operator]
-        i = int(np.argmax(sims))
-        return self._index_owner[i], float(sims[i])
+        ranked = self.rank(text)
+        return ranked[0] if ranked else (None, -1.0)
+
+    def _attempt(self, task: _Task, text: str) -> tuple[bool, dict | str]:
+        """Cues and slot binding for one candidate: (True, args) or (False, reason)."""
+        if task.cues and not any(re.search(c, text, flags=re.I) for c in task.cues):
+            return False, "cue_missing"
+        bound = bind_slots(text, task.slots, task.text_slots)
+        return (True, bound.values) if bound.ok else (False, bound.reason)
 
     # ---- execution ----------------------------------------------------
-    def run(self, text: str, fallback: Callable[[str], Any] | None = None) -> Result:
-        name, sim = self.identify(text)
-        reason, args = "", None
+    def route(self, text: str) -> Result:
+        """Decide what to do with ``text`` without calling any fallback. Returns
+        source ``"computation"`` (value is ready) or ``"fallback"`` (the caller
+        must answer it, with ``reason`` saying why). Every call is recorded."""
+        t0 = time.perf_counter()
+        ranked = self.rank(text)
+        name, sim = ranked[0] if ranked else (None, -1.0)
+        reason, args, shadow, mode = "", None, None, "active"
+        out: Result | None = None
         if name is None:
             reason = "no_tasks"
-        elif sim < self.min_similarity:
-            reason = "below_similarity"
         else:
-            task = self._tasks[name]
-            if task.cues and not any(re.search(c, text, flags=re.I) for c in task.cues):
-                reason = "cue_missing"
+            # Embedding similarity only proposes candidates. Slot binding decides.
+            # Try every candidate above its threshold, closest first.
+            bound_ok: list[tuple[str, float, dict]] = []
+            first_failure = "below_similarity"
+            for cand, csim in ranked:
+                task = self._tasks[cand]
+                threshold = task.min_similarity if task.min_similarity is not None else self.min_similarity
+                if csim < threshold:
+                    continue
+                ok, res = self._attempt(task, text)
+                if ok:
+                    bound_ok.append((cand, csim, res))  # type: ignore[arg-type]
+                elif first_failure == "below_similarity":
+                    first_failure = res  # type: ignore[assignment]
+            if not bound_ok:
+                reason = first_failure
+                mode = self._tasks[name].mode
             else:
-                bound = bind_slots(text, task.slots, task.text_slots)
-                if not bound.ok:
-                    reason = bound.reason
-                else:
-                    args = bound.values
-                    try:
-                        return Result("computation", task.fn(**args), name, sim, args)
-                    except Exception as exc:  # the tool itself refused, for example divide by zero
-                        reason = f"tool_error:{type(exc).__name__}"
-        if fallback is not None:
-            return Result("fallback", fallback(text), name, sim, args, reason)
-        return Result("refused", None, name, sim, args, reason)
+                name, sim, args = bound_ok[0]
+                task = self._tasks[name]
+                mode = task.mode
+                try:
+                    value = task.fn(**args)
+                    rival = None
+                    for cand, csim, cargs in bound_ok[1:]:
+                        if sim - csim >= self.ambiguity_margin:
+                            break
+                        try:
+                            other = self._tasks[cand].fn(**cargs)
+                        except Exception:
+                            continue
+                        if other != value:
+                            rival = cand
+                            break
+                    if rival is not None:
+                        reason = f"ambiguous_task:{name}|{rival}"
+                    else:
+                        rendered = render_format(task.format, value, args)
+                        if task.mode == "shadow":
+                            shadow, reason = value, "shadow"
+                        else:
+                            out = Result("computation", value, name, sim, args, text=rendered)
+                except Exception as exc:  # the tool itself refused, e.g. divide by zero
+                    reason = f"tool_error:{type(exc).__name__}"
+        if out is None:
+            out = Result("fallback", None, name, sim, args, reason, shadow_value=shadow)
+        out.latency_ms = (time.perf_counter() - t0) * 1000
+        out.request_id = self.telemetry.record(
+            source=out.source, task=out.task, similarity=sim, reason=out.reason,
+            latency_ms=out.latency_ms, text=text, mode=mode, shadow_value=shadow)
+        return out
+
+    def note_shadow(self, result: Result, llm_answer: Any) -> bool | None:
+        """Shadow mode: compare the tool's value with the LLM's answer (the last
+        number in it) and record agreement. Returns None if it cannot compare."""
+        if result.shadow_value is None or result.task is None:
+            return None
+        try:
+            expected = float(result.shadow_value)
+        except (TypeError, ValueError):
+            return None
+        nums = extract_numbers(llm_answer if isinstance(llm_answer, str) else str(llm_answer))
+        if not nums:
+            result.shadow_agrees = False
+        else:
+            got = nums[-1]
+            result.shadow_agrees = abs(got - expected) <= max(1e-3, 1e-3 * abs(expected))
+        self.telemetry.record_shadow(result.task, result.shadow_agrees)
+        return result.shadow_agrees
+
+    def run(self, text: str, fallback: Callable[[str], Any] | None = None) -> Result:
+        r = self.route(text)
+        if r.source == "computation":
+            return r
+        if fallback is None:
+            r.source = "refused"
+            return r
+        r.value = fallback(text)
+        self.note_shadow(r, r.value)
+        return r
+
+    async def arun(self, text: str,
+                   fallback: Callable[[str], Any | Awaitable[Any]] | None = None) -> Result:
+        """Async variant. Routing runs in a worker thread so embedding does not
+        block the event loop. ``fallback`` may be sync or async."""
+        r = await asyncio.to_thread(self.route, text)
+        if r.source == "computation":
+            return r
+        if fallback is None:
+            r.source = "refused"
+            return r
+        out = fallback(text)
+        r.value = await out if inspect.isawaitable(out) else out
+        self.note_shadow(r, r.value)
+        return r

@@ -1,0 +1,104 @@
+# Five finance tools, defined without code. Try it:
+#   aicache validate examples/finance_tools.yaml
+#   aicache test     examples/finance_tools.yaml
+#   aicache run      examples/finance_tools.yaml "What is 15% of 240?"
+version: 1
+min_similarity: 0.45
+embedder: {type: sentence-transformers}      # use `hashing` for a no-download trial
+# upstream:                                   # needed only for `aicache serve`
+#   base_url: http://localhost:11434/v1       # any OpenAI-compatible server
+#   model: llama3
+
+tools:
+  - name: percent_of
+    description: A percentage of an amount.
+    examples:
+      - "What is X percent of Y?"
+      - "Calculate X% of Y."
+      - "How much is X percent of the amount Y?"
+    slots:
+      - {name: pct,  after: "%|percent", min: 0, max: 100}
+      - {name: base, before: "of"}
+    cues: ["%|percent"]
+    compute: "base * pct / 100"
+    format: "{value:.2f}"
+    tests:
+      - {text: "What is 15% of 240?", expect: 36}
+      - {text: "Of 240, what is 15 percent?", expect: 36}
+      - {text: "What is 15% of that?", expect: refuse}
+      - {text: "What does percent mean?", expect: refuse}
+
+  - name: discounted_price
+    description: Price after a percentage discount.
+    examples:
+      - "What is the price after a Y percent discount on X?"
+      - "Apply a Y% discount to a price of X."
+      - "How much does an item cost if it is Y percent off X?"
+    slots:
+      - {name: discount, after: "%|percent", min: 0, max: 100}
+      - {name: price,    before: "price of|price is|price|cost of|off"}
+    cues: ["discount|\\boff\\b|sale"]
+    compute: "price * (1 - discount / 100)"
+    format: "{value:.2f}"
+    tests:
+      - {text: "Apply a 20 percent discount to a price of 80", expect: 64}
+      - {text: "What is the price after a 25% discount on a price of 200?", expect: 150}
+      - {text: "Apply a discount to a price of 80", expect: refuse}
+
+  - name: compound_interest
+    description: Final amount after compound interest, compounded yearly.
+    examples:
+      - "If I invest X dollars at Y percent annual interest for Z years, what is the final amount?"
+      - "Calculate compound interest on X at a rate of Y percent over Z years."
+      - "How much will X grow to at Y% for Z years?"
+    slots:
+      - {name: rate,      after: "%|percent", min: 0, max: 100}
+      - {name: years,     after: "years?|yrs?", min: 0}
+      - {name: principal, before: "invest|principal|of|on", after: "grow"}
+    compute: "principal * (1 + rate / 100) ** years"
+    format: "{value:.2f}"
+    tests:
+      - {text: "If I invest $1000 at 5 percent for 3 years, what is the final amount?", expect: 1157.625}
+      - {text: "Over 3 years at 5 percent, what does $1000 grow to?", expect: 1157.625}
+      - {text: "If I invest $1000 at 5 percent, what is the final amount?", expect: refuse}
+
+  - name: position_size
+    description: Shares to buy so a stop-out loses a fixed percent of the account.
+    examples:
+      - "How many shares should I buy given my account size and risk percent?"
+      - "Calculate the position size for a trade with an entry price and a stop price."
+      - "What size position can I take risking a percent of my account?"
+    slots:
+      - {name: entry_price,  before: "entry(?: price)?|enter(?:ing)?|buy(?:ing)?|in at", after: "entry"}
+      - {name: stop_price,   before: "stop(?:[- ]loss)?(?: price)?|stops? out|out at"}
+      - {name: account_size, before: "account(?: size)?|portfolio|have|(?:%|percent)\\s+of",
+         after: "(?:in\\s+(?:the|my)\\s+)?(?:account|portfolio)"}
+      - {name: risk_percent, before: "risk(?:ing)?(?: percent| limit)?", after: "%|percent", min: 0, max: 100}
+    text_slots:
+      - {name: symbol, pattern: "\\b([A-Z]{2,5})\\b"}
+    compute: "round(account_size * risk_percent / 100 / abs(entry_price - stop_price), 2)"
+    format: "{value:.2f} shares of {symbol}"
+    tests:
+      - {text: "Size my TSLA trade: stop 436.81, entry 476.92, risking 0.5 percent of $50000.", expect: 6.23}
+      - {text: "Position size for AAPL: account $25000, risk 2%, entry 150, stop 140.", expect: 50}
+      - {text: "How many AAPL shares can I buy with entry 150 and stop 140?", expect: refuse}
+      - {text: "What does position sizing mean?", expect: refuse}
+
+  - name: r_multiple_target
+    description: Profit target at a multiple of the initial risk.
+    examples:
+      - "Calculate the profit target for a trade using R multiples."
+      - "Where is my R-multiple target given my entry price and stop price?"
+      - "Compute reward-to-risk targets for a stock trade from entry and stop."
+    slots:
+      - {name: entry_price,   before: "entry(?: price)?|enter(?:ing)?|buy(?:ing)?|get(?:ting)? in|in at|long"}
+      - {name: stop_price,    before: "stop(?:[- ]loss)?(?: price)?|stops? out|bail(?:s)?(?: out)?|out at"}
+      - {name: risk_multiple, after: "r\\b|:\\s*1|times", before: "multiple", min: 1, max: 20, integer: true}
+    text_slots:
+      - {name: symbol, pattern: "\\b([A-Z]{2,5})\\b"}
+    compute: "round(entry_price + abs(entry_price - stop_price) * risk_multiple, 2)"
+    format: "{risk_multiple:g}R target for {symbol}: {value:.2f}"
+    tests:
+      - {text: "I'm buying NVDA at $100 with a stop at $95. Where is my 3R target?", expect: 115}
+      - {text: "Give me a 4:1 reward-to-risk profit target on AAPL: in at 215.5, out at 200 if wrong.", expect: 277.5}
+      - {text: "Target for a 3 to 1 payoff on AAPL, entry 100, stop 95", expect: refuse}
