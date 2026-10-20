@@ -6,3 +6,8 @@ how the pieces here fit together.
 """
 
 __version__ = "0.1.0"
+
+# Public integration API (experimental). See README, "Use it in your own workflow".
+from .router import ComputationRouter, Result, Slot, TextSlot, bind_slots  # noqa: E402
+
+__all__ = ["ComputationRouter", "Result", "Slot", "TextSlot", "bind_slots"]
