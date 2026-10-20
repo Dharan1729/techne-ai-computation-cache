@@ -31,6 +31,8 @@ jobs:
         with:
           path: ~/.cache/huggingface
           key: hf-langcache-embed-v1
+      - name: CPU-only torch (the default wheel pulls GPU libraries)
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - run: pip install -e ".[dev]"
       - run: python -m pytest -q
       - name: Example config and labeled set stay clean
