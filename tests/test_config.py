@@ -170,3 +170,17 @@ def test_two_tools_that_agree_are_not_ambiguous():
     r = _two_tools(lambda x, y: y + x)
     res = r.route("combine 3 and 4")
     assert res.source == "computation" and res.value == 7
+
+
+def test_lint_flags_risky_learning_settings():
+    base = {"embedder": {"type": "hashing"},
+            "learning": {"enabled": True, "min_agreements": 1, "audit_rate": 0.1,
+                         "normalizer": {"base_url": "http://x/v1", "model": "tiny"}}}
+    msgs = [f"{i.level}: {i.message}" for i in lint_config(load_config(base))]
+    assert any("needs an upstream" in m for m in msgs)
+    assert any("min_agreements is 1" in m for m in msgs)
+    assert any("audit_rate needs upstream.model" in m for m in msgs)
+    ok = {**base, "upstream": {"base_url": "http://u/v1", "model": "big"},
+          "learning": {**base["learning"], "min_agreements": 5}}
+    msgs = [f"{i.level}: {i.message}" for i in lint_config(load_config(ok))]
+    assert not any(m.startswith("warning") for m in msgs)

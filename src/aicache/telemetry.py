@@ -34,6 +34,7 @@ class Telemetry:
         self.reasons: Counter[str] = Counter()           # fallback / refusal reasons
         self.tasks: Counter[str] = Counter()             # computed, by task
         self.shadow: Counter[str] = Counter()            # "<task>:agree" / "<task>:disagree"
+        self.learning: Counter[str] = Counter()          # learning outcomes, see record_learning
         self._lat_buckets = [0] * (len(LATENCY_BUCKETS_MS) + 1)
         self._lat_sum = 0.0
 
@@ -77,6 +78,11 @@ class Telemetry:
         with self._lock:
             self.shadow[f"{task}:{'agree' if agrees else 'disagree'}"] += 1
 
+    def record_learning(self, outcome: str) -> None:
+        """Outcomes: learned, merged, promoted, demoted, skipped:<why>, rejected:<why>, dropped:queue_full."""
+        with self._lock:
+            self.learning[outcome] += 1
+
     def recent(self, limit: int = 50) -> list[dict]:
         with self._lock:
             return list(self._ring)[-limit:][::-1]
@@ -93,6 +99,7 @@ class Telemetry:
                 "fallback_reasons": dict(self.reasons),
                 "computed_by_task": dict(self.tasks),
                 "shadow": dict(self.shadow),
+                "learning": dict(self.learning),
                 "mean_route_latency_ms": (self._lat_sum / total) if total else 0.0,
             }
 
@@ -115,6 +122,10 @@ class Telemetry:
             for k, n in sorted(self.shadow.items()):
                 task, verdict = k.rsplit(":", 1)
                 lines.append(f'aicache_shadow_total{{task="{task}",result="{verdict}"}} {n}')
+            lines += ["# HELP aicache_learning_total Outcomes of learning new actions.",
+                      "# TYPE aicache_learning_total counter"]
+            for k, n in sorted(self.learning.items()):
+                lines.append(f'aicache_learning_total{{outcome="{k}"}} {n}')
             lines += ["# HELP aicache_route_latency_ms Routing decision latency.",
                       "# TYPE aicache_route_latency_ms histogram"]
             cum = 0

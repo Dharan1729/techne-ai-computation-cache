@@ -53,6 +53,7 @@ import numpy as np
 from .binding.extractor import extract_numbers
 from .embedders import EmbedderLike, SentenceTransformerEmbedder
 from .telemetry import Telemetry
+from .text import mask_numbers
 
 MAX_GAP = 25  # characters allowed between a keyword and the number it labels
 MODES = ("active", "shadow", "off")
@@ -199,6 +200,13 @@ class _Task:
     mode: str = "active"
     min_similarity: float | None = None
     format: str = "{value}"
+    # Learned actions are matched in masked form: ``examples`` already hold masked
+    # templates ("What is #% of #?") and the request is masked the same way.
+    masked: bool = False
+    example_vecs: np.ndarray | None = None  # stored embeddings of ``examples``, if known
+    # A custom binder replaces slot matching: it maps request text to BindResult.
+    # Learned templates use one that requires the request to BE the template.
+    binder: Callable[[str], "BindResult"] | None = None
 
 
 class ComputationRouter:
@@ -211,8 +219,8 @@ class ComputationRouter:
         self.ambiguity_margin = ambiguity_margin
         self.telemetry = telemetry or Telemetry()
         self._tasks: dict[str, _Task] = {}
-        self._index: np.ndarray | None = None
-        self._index_owner: list[str] = []
+        self._index: dict[bool, np.ndarray] | None = None  # masked? -> example vectors
+        self._index_owner: dict[bool, list[str]] = {False: [], True: []}
         self._lock = threading.RLock()
 
     # ---- registration -------------------------------------------------
@@ -229,15 +237,20 @@ class ComputationRouter:
         mode: str = "active",
         min_similarity: float | None = None,
         format: str = "{value}",
+        masked: bool = False,
+        example_vecs: np.ndarray | None = None,
+        binder: Callable[[str], "BindResult"] | None = None,
+        param_names: Sequence[str] = (),
     ) -> None:
         """``cues`` are optional regexes; if given, a request must match at
         least one. Use them when two tools take the same parameters and differ
-        only by operation (add / subtract), where embeddings can confuse them."""
+        only by operation (add / subtract), where embeddings can confuse them.
+        ``masked`` and ``example_vecs`` are used for learned actions."""
         if not examples:
             raise ValueError("give at least one example phrasing")
         if mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}")
-        names = [s.name for s in slots] + [t.name for t in text_slots]
+        names = [s.name for s in slots] + [t.name for t in text_slots] + list(param_names)
         if len(set(names)) != len(names):
             raise ValueError(f"task {name!r} has duplicate parameter names")
         for fld in _FIELD_RE.finditer(format):
@@ -245,7 +258,13 @@ class ComputationRouter:
                 raise ValueError(f"format refers to unknown field {{{fld.group('name')}}}")
         with self._lock:
             self._tasks[name] = _Task(name, fn, list(examples), list(slots), list(text_slots),
-                                      list(cues), description, mode, min_similarity, format)
+                                      list(cues), description, mode, min_similarity, format,
+                                      masked, example_vecs, binder)
+            self._index = None
+
+    def remove_task(self, name: str) -> None:
+        with self._lock:
+            self._tasks.pop(name, None)
             self._index = None
 
     def task(self, *, examples: Sequence[str], slots: Sequence[Slot],
@@ -270,14 +289,31 @@ class ComputationRouter:
 
     # ---- identification -----------------------------------------------
     def _build(self) -> None:
-        texts, owners = [], []
+        """Embed every example of every non-off task, once. Raw and masked tasks
+        keep separate indexes because a request is compared to each in its own form."""
+        texts: dict[bool, list[str]] = {False: [], True: []}
+        owners: dict[bool, list[str]] = {False: [], True: []}
+        vecs: dict[bool, list[np.ndarray | None]] = {False: [], True: []}
         for t in self._tasks.values():
             if t.mode == "off":
                 continue
-            for ex in t.examples:
-                texts.append(ex)
-                owners.append(t.name)
-        self._index = self.embedder.encode(texts) if texts else np.zeros((0, 1))
+            have = t.example_vecs is not None and len(t.example_vecs) == len(t.examples)
+            for i, ex in enumerate(t.examples):
+                texts[t.masked].append(ex)
+                owners[t.masked].append(t.name)
+                vecs[t.masked].append(t.example_vecs[i] if have else None)  # type: ignore[index]
+        index: dict[bool, np.ndarray] = {}
+        for k in (False, True):
+            if not texts[k]:
+                index[k] = np.zeros((0, 1))
+                continue
+            missing = [i for i, v in enumerate(vecs[k]) if v is None]
+            if missing:
+                fresh = self.embedder.encode([texts[k][i] for i in missing])
+                for j, i in enumerate(missing):
+                    vecs[k][i] = fresh[j]
+            index[k] = np.vstack(vecs[k])  # type: ignore[arg-type]
+        self._index = index
         self._index_owner = owners
 
     def rank(self, text: str) -> list[tuple[str, float]]:
@@ -286,13 +322,15 @@ class ComputationRouter:
             if self._index is None:
                 self._build()
             index, owners = self._index, self._index_owner
-        if index is None or index.shape[0] == 0:
-            return []
-        sims = index @ self.embedder.encode_one(text)
+        assert index is not None
         best: dict[str, float] = {}
-        for owner, s in zip(owners, sims):
-            if s > best.get(owner, -2.0):
-                best[owner] = float(s)
+        for masked in (False, True):
+            if index[masked].shape[0] == 0:
+                continue
+            q = self.embedder.encode_one(mask_numbers(text) if masked else text)
+            for owner, s in zip(owners[masked], index[masked] @ q):
+                if s > best.get(owner, -2.0):
+                    best[owner] = float(s)
         return sorted(best.items(), key=lambda kv: -kv[1])
 
     def identify(self, text: str) -> tuple[str | None, float]:
@@ -305,7 +343,7 @@ class ComputationRouter:
         """Cues and slot binding for one candidate: (True, args) or (False, reason)."""
         if task.cues and not any(re.search(c, text, flags=re.I) for c in task.cues):
             return False, "cue_missing"
-        bound = bind_slots(text, task.slots, task.text_slots)
+        bound = task.binder(text) if task.binder else bind_slots(text, task.slots, task.text_slots)
         return (True, bound.values) if bound.ok else (False, bound.reason)
 
     # ---- execution ----------------------------------------------------
@@ -326,7 +364,9 @@ class ComputationRouter:
             bound_ok: list[tuple[str, float, dict]] = []
             first_failure = "below_similarity"
             for cand, csim in ranked:
-                task = self._tasks[cand]
+                task = self._tasks.get(cand)
+                if task is None:  # removed by a concurrent update (a learned action was reinstalled)
+                    continue
                 threshold = task.min_similarity if task.min_similarity is not None else self.min_similarity
                 if csim < threshold:
                     continue
@@ -335,36 +375,40 @@ class ComputationRouter:
                     bound_ok.append((cand, csim, res))  # type: ignore[arg-type]
                 elif first_failure == "below_similarity":
                     first_failure = res  # type: ignore[assignment]
+            top = self._tasks.get(name)
             if not bound_ok:
                 reason = first_failure
-                mode = self._tasks[name].mode
+                mode = top.mode if top else "active"
             else:
                 name, sim, args = bound_ok[0]
-                task = self._tasks[name]
-                mode = task.mode
-                try:
-                    value = task.fn(**args)
-                    rival = None
-                    for cand, csim, cargs in bound_ok[1:]:
-                        if sim - csim >= self.ambiguity_margin:
-                            break
-                        try:
-                            other = self._tasks[cand].fn(**cargs)
-                        except Exception:
-                            continue
-                        if other != value:
-                            rival = cand
-                            break
-                    if rival is not None:
-                        reason = f"ambiguous_task:{name}|{rival}"
-                    else:
-                        rendered = render_format(task.format, value, args)
-                        if task.mode == "shadow":
-                            shadow, reason = value, "shadow"
+                task = self._tasks.get(name)
+                if task is None:
+                    reason, mode = "task_removed", "active"
+                else:
+                    mode = task.mode
+                    try:
+                        value = task.fn(**args)
+                        rival = None
+                        for cand, csim, cargs in bound_ok[1:]:
+                            if sim - csim >= self.ambiguity_margin:
+                                break
+                            try:
+                                other = self._tasks[cand].fn(**cargs)
+                            except Exception:
+                                continue
+                            if other != value:
+                                rival = cand
+                                break
+                        if rival is not None:
+                            reason = f"ambiguous_task:{name}|{rival}"
                         else:
-                            out = Result("computation", value, name, sim, args, text=rendered)
-                except Exception as exc:  # the tool itself refused, e.g. divide by zero
-                    reason = f"tool_error:{type(exc).__name__}"
+                            rendered = render_format(task.format, value, args)
+                            if task.mode == "shadow":
+                                shadow, reason = value, "shadow"
+                            else:
+                                out = Result("computation", value, name, sim, args, text=rendered)
+                    except Exception as exc:  # the tool itself refused, e.g. divide by zero
+                        reason = f"tool_error:{type(exc).__name__}"
         if out is None:
             out = Result("fallback", None, name, sim, args, reason, shadow_value=shadow)
         out.latency_ms = (time.perf_counter() - t0) * 1000

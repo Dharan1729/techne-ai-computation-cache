@@ -182,6 +182,56 @@ class ServerCfg(_Strict):
     max_text_chars: int = Field(default=4000, ge=1)  # longer requests skip the router and go to the LLM
 
 
+DEFAULT_LLM_REPLY = r"\b(explain|why|summari[sz]e|describe|walk me through|step by step|show (your|the) work)"
+
+
+class NormalizerCfg(_Strict):
+    """The small LLM that turns a request into a reusable action (any OpenAI-compatible endpoint)."""
+    base_url: str = ""
+    model: str = ""
+    api_key_env: str | None = None
+    timeout_s: float = 60.0
+    json_mode: bool = True
+
+
+class LearningCfg(_Strict):
+    enabled: bool = False
+    store: str = "aicache.db"          # SQLite file holding learned actions and their embeddings
+    normalizer: NormalizerCfg = NormalizerCfg()
+    min_agreements: int = Field(default=5, ge=1)   # distinct parameter sets the LLM must agree on before an action answers
+    reject_after: int = Field(default=2, ge=1)     # disagreements that reject a candidate
+    promotion: Literal["auto", "manual"] = "auto"
+    max_actions: int = Field(default=500, ge=1)
+    max_request_chars: int = Field(default=300, ge=20)
+    max_numbers: int = Field(default=5, ge=1)
+    skip_patterns: list[str] = []      # extra regexes: requests matching one are never learned from
+    queue_size: int = Field(default=100, ge=1)
+    audit_rate: float = Field(default=0.0, ge=0.0, le=1.0)  # share of live answers re-checked against the LLM
+    synchronous: bool = False          # learn inline instead of on a background thread (tests, batch runs)
+
+    @field_validator("skip_patterns")
+    @classmethod
+    def _skip(cls, v: list[str]) -> list[str]:
+        return [_regex(p, "skip pattern") for p in v]
+
+    @model_validator(mode="after")
+    def _need_normalizer(self) -> "LearningCfg":
+        if self.enabled and not (self.normalizer.base_url and self.normalizer.model):
+            raise ValueError("learning.enabled needs learning.normalizer.base_url and learning.normalizer.model")
+        return self
+
+
+class ReplyCfg(_Strict):
+    # Requests matching this regex get their reply written by the LLM from the computed
+    # value. All others are answered from the action's reply template with no LLM call.
+    llm_when: str | None = DEFAULT_LLM_REPLY
+
+    @field_validator("llm_when")
+    @classmethod
+    def _re(cls, v: str | None) -> str | None:
+        return _regex(v, "llm_when") if v else v
+
+
 class Config(_Strict):
     version: Literal[1] = 1
     min_similarity: float = Field(default=0.5, ge=-1.0, le=1.0)
@@ -190,10 +240,14 @@ class Config(_Strict):
     upstream: UpstreamCfg | None = None
     telemetry: TelemetryCfg = TelemetryCfg()
     server: ServerCfg = ServerCfg()
-    tools: list[ToolCfg] = Field(min_length=1)
+    learning: LearningCfg = LearningCfg()
+    reply: ReplyCfg = ReplyCfg()
+    tools: list[ToolCfg] = []
 
     @model_validator(mode="after")
     def _unique(self) -> "Config":
+        if not self.tools and not self.learning.enabled:
+            raise ValueError("give at least one tool, or turn on learning")
         names = [t.name for t in self.tools]
         dup = {n for n in names if names.count(n) > 1}
         if dup:
@@ -345,6 +399,24 @@ def lint_config(cfg: Config) -> list[Issue]:
                     f"takes the same number of parameters as {others} and has no 'cues'; embeddings can "
                     "confuse tools that differ only by operation (this caused 20 wrong hits in 1500 in our "
                     "benchmark). Add cues, or confirm with `aicache eval`."))
+    lc = cfg.learning
+    if lc.enabled:
+        if cfg.upstream is None:
+            issues.append(Issue("warning", "learning", "learning in the gateway needs an upstream: its answers are what "
+                                "learned actions are checked against. (From Python, pass your own LLM to `handle`.)"))
+        if lc.audit_rate and not (cfg.upstream and cfg.upstream.model):
+            issues.append(Issue("warning", "learning", "audit_rate needs upstream.model: the gateway makes the audit call "
+                                "itself and must know which model to ask for."))
+        if lc.min_agreements < 3:
+            issues.append(Issue("warning", "learning", f"min_agreements is {lc.min_agreements}: a formula that happens to be "
+                                "right on that few number sets can start answering requests. 3 or more is safer."))
+        if lc.promotion == "auto" and not lc.audit_rate:
+            issues.append(Issue("info", "learning", "promotion is automatic and audits are off: nothing re-checks an action "
+                                "once it is live. Consider audit_rate: 0.02, or promotion: manual."))
+        if lc.normalizer.base_url == (cfg.upstream.base_url if cfg.upstream else None) and lc.normalizer.model == (
+                cfg.upstream.model if cfg.upstream else None):
+            issues.append(Issue("info", "learning", "the normalizer is the same model as the upstream. That works, but "
+                                "a smaller, cheaper model is usually enough to identify an operation."))
     seen: dict[str, str] = {}
     for t in cfg.tools:
         for ex in t.examples:

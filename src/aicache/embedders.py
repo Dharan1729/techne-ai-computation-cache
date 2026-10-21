@@ -50,7 +50,13 @@ class SentenceTransformerEmbedder:
                     "the sentence-transformers embedder needs the 'embeddings' extra: "
                     "pip install 'ai-computation-cache[embeddings]'"
                 ) from exc
-            self._model = SentenceTransformer(self.model_name)
+            # Prefer the local cache. Loading normally makes network checks against the
+            # Hugging Face Hub even for a cached model, and on a flaky network that can block
+            # a restart indefinitely. Only reach out if the model is not on disk yet.
+            try:
+                self._model = SentenceTransformer(self.model_name, local_files_only=True)
+            except Exception:
+                self._model = SentenceTransformer(self.model_name)
         return self._model
 
     def encode(self, texts: Sequence[str]) -> np.ndarray:
