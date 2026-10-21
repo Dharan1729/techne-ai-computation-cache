@@ -114,6 +114,9 @@ def main() -> None:
     ap.add_argument("--min-similarity", type=float, default=0.6)
     ap.add_argument("--min-agreements", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0, help="debug: only the first N learning requests")
+    ap.add_argument("--test-param-sets", type=int, default=6, help="number sets per task in the new stream")
+    ap.add_argument("--test-paraphrases", type=int, default=3,
+                    help="wordings per number set in the new stream; 1 means no request repeats earlier numbers")
     ap.add_argument("--output", default="results/learning/run.json")
     a = ap.parse_args()
 
@@ -134,7 +137,8 @@ def main() -> None:
     main_llm, main_name = make_main(a.main)
 
     learn_set = generate_workload(seed=a.learn_seed)
-    test_set = generate_workload(seed=a.test_seed)
+    test_set = generate_workload(seed=a.test_seed, param_sets_per_task=a.test_param_sets,
+                                 paraphrases_per_param_set=a.test_paraphrases)
     if a.limit:
         learn_set = learn_set[: a.limit]
     t0 = time.time()

@@ -79,17 +79,24 @@ aicache actions aicache.yaml               # each action, its wordings and the e
 aicache approve aicache.yaml percent_of    # or set learning.promotion: manual to approve everything yourself
 ```
 
-From Python:
+From your own code, with any model or framework, two calls are the whole contract:
 
 ```python
 from aicache.config import load_config
 from aicache.engine import ActionCache
 
 cache = ActionCache.from_config(load_config("aicache.yaml"))
-out = cache.handle("What is 15% of 240?", llm=lambda text: call_my_model(text))
-out.source   # "computation" or "llm"
-out.text     # the reply
+
+def answer(text):
+    r = cache.lookup(text)                  # ask the cache
+    if r.source == "computation":
+        return r.text                       # answered, no model call
+    reply = call_my_model(text)             # your model, however you call it
+    cache.record(text, r, reply)            # hand the answer back: this is how it learns
+    return reply
 ```
+
+Shortcuts: `cache.wrap(llm)`, `await cache.ahandle(text, llm)`, `cache.handle(text, llm)`, and `computation_first(cache, llm)` for LangChain and LangGraph. See [putting it in your product](docs/guide/integrate.md).
 
 Full walkthrough: [docs/guide/quickstart.md](docs/guide/quickstart.md). A complete config is [examples/learning.yaml](examples/learning.yaml).
 
@@ -133,6 +140,25 @@ The first real-model run of an earlier, looser design produced wrong answers (3 
 
 ![Accuracy and latency against the fair baseline](results/figures/fig1_baselines.png)
 
+## Compared with other caches
+
+Same requests for every system: 150 to learn from, then new requests with new numbers. The main model is always correct, so every wrong answer is the cache's own. The semantic cache reuses an old *answer*; the hand-written column is the previous design, where a person writes every operation in advance.
+
+New requests answered without calling the LLM (wrong answers in brackets):
+
+| | Numbers often repeat | **No request repeats numbers** |
+|---|---|---|
+| No cache, exact cache | 0 | 0 |
+| Semantic cache, threshold 0.75 | 96 (**3 wrong**) | 8 (**8 wrong**) |
+| Semantic cache, threshold 0.90 | 59 (0 wrong) | 0 |
+| Hand-written tools (needs a person) | 112 (0 wrong) | 124 (0 wrong) |
+| **aicache, default (5 agreements)** | 82 (0 wrong) | 86 (0 wrong) |
+| **aicache, 3 agreements** | 124 (0 wrong) | 126 (0 wrong) |
+
+A semantic cache depends on numbers repeating: when none do, its loose setting answered 8 requests and all 8 were wrong, and its strict settings answered nothing. aicache matches the wording and the operation, so its coverage did not change, and with 3 agreements it reached the hand-written tools' coverage without a person writing them. This is one workload, one run per row. The semantic cache is built for repeated or similar requests, and on a stream full of exact repeats it would do better than shown. Real GPTCache and RedisVL results on a related stream are in EXP-006. Details and limits: EXP-020.
+
+![Against other caches](results/figures/fig5_comparison.png)
+
 ## What you get
 
 | | |
@@ -167,7 +193,8 @@ The first real-model run of an earlier, looser design produced wrong answers (3 
 - [Config reference](docs/guide/config-reference.md)
 - [Rolling it out safely](docs/guide/rollout.md)
 - [The gateway](docs/guide/gateway.md): endpoints, auth, metrics, Docker
-- [Integrations](docs/guide/integrations.md): Python, LangChain, tools you write yourself
+- [Putting it in your product](docs/guide/integrate.md): the two-call interface, LangChain, what you can swap
+- [Integrations](docs/guide/integrations.md): more Python and LangChain detail
 - [Tools you write yourself](docs/guide/how-it-decides.md)
 - [Changelog](CHANGELOG.md), [Security](SECURITY.md), [Contributing](CONTRIBUTING.md)
 
@@ -177,7 +204,7 @@ A semantic cache treats "What is 10 + 20?" and "What is 712 + 381?" as nearly th
 
 This is not a new technique. Plan caching and structured-intent caching exist: Zhang, Wornow, Wan and Olukotun, [Agentic Plan Caching](https://arxiv.org/abs/2506.14852), which reports 50.31% lower cost and 27.28% lower latency in its current abstract; Basu, [Structured Intent Canonicalization](https://arxiv.org/abs/2602.18922). The full map of 17 systems is in [docs/prior-art.md](docs/prior-art.md). What this project adds is a controlled comparison of one combination (identify, bind, validate, fall back), a learning loop with probation, and the failures reported.
 
-19 logged experiments across four workload levels, with real GPTCache and RedisVL as baselines. A good semantic cache stayed about 99% correct on plain arithmetic but served nothing when numbers never repeat; the computation approach served about 75% in the same case. The research docs are in [docs/](docs/); the code is in `src/aicache/` and `benchmarks/`.
+20 logged experiments across four workload levels, with real GPTCache and RedisVL as baselines. A good semantic cache stayed about 99% correct on plain arithmetic but served nothing when numbers never repeat; the computation approach served about 75% in the same case. The research docs are in [docs/](docs/); the code is in `src/aicache/` and `benchmarks/`.
 
 ![When each cache works](results/figures/fig2_repeats.png)
 
@@ -196,6 +223,7 @@ python -m benchmarks.learning_eval --normalizer llama3 --main ollama:llama3     
 | Claim | How to check |
 |---|---|
 | Learning results and the table above | `python -m benchmarks.learning_eval`, committed copies in `results/learning/` |
+| The comparison with other caches | `python -m benchmarks.learning_vs_baselines` (reads the learning results, runs the baselines) |
 | The learning loop's safety rules | `python -m pytest tests/test_learning.py` (offline, no model) |
 | Gateway end to end | `python -m benchmarks.gateway_e2e`, committed copy `results/gateway_e2e.json` |
 | Tools you write yourself | `aicache eval examples/finance_tools.yaml --labeled examples/finance_labeled.jsonl` |

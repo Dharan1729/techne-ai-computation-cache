@@ -12,7 +12,8 @@ The product now follows the original design: it learns the operation behind a re
 - CLI: `learn`, `actions`, `action`, `approve`, `reject`, `export`, `import`.
 - Privacy: requests that look like they contain emails, long numbers, SSNs or secrets are never learned from.
 - Config: `learning` and `reply` sections; tools are optional when learning is on; lint rules for risky learning settings.
-- Experiment EXP-019: the learning loop with real small models.
+- `ActionCache.lookup` / `record` (a two-call interface for any framework), `wrap`, `ahandle`; the LangChain runnable now learns.
+- Experiments EXP-019 (the learning loop with real small models) and EXP-020 (against semantic and exact caches and a hand-written registry).
 
 ## 0.2.0
 

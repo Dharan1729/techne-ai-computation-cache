@@ -203,6 +203,45 @@ def fig_learning(res_dir: Path, out: Path) -> None:
     plt.close(fig)
 
 
+def fig_comparison(res_dir: Path, out: Path) -> None:
+    """aicache against the other caches on the same streams. From results/learning/baselines.json."""
+    d = json.loads((res_dir / "baselines.json").read_text())
+    scen = [("numbers_repeat", "Many requests repeat earlier numbers"), ("numbers_never_repeat", "No request repeats earlier numbers")]
+    order = [("semantic_cache@0.75", "Semantic cache, threshold 0.75", ORANGE), ("semantic_cache@0.9", "Semantic cache, threshold 0.90", ORANGE),
+             ("aicache_learning@5_agreements", "aicache, default (5 agreements)", BLUE),
+             ("aicache_learning@3_agreements", "aicache, 3 agreements", BLUE),
+             ("hand_written_registry", "Hand-written tools (needs a person)", GRAY)]
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 6), sharey=True)
+    for ax, (key, title) in zip(axes, scen):
+        rows = d[key]
+        for y, (name, label, col) in zip(range(len(order))[::-1], order):
+            if name not in rows:
+                continue
+            ns = rows[name]["new_stream"]
+            total = rows["no_cache"]["new_stream"]["llm_calls"]
+            right, wrong = ns["answered_by_cache"] - ns["wrong_answers"], ns["wrong_answers"]
+            ax.barh(y, 100 * right / total, color=col, height=0.55)
+            ax.barh(y, 100 * wrong / total, left=100 * right / total, color="#d03b3b", height=0.55)
+            ax.text(100 * ns["answered_by_cache"] / total + 1.5, y, f"{ns['answered_by_cache']}  ({wrong} wrong)", va="center",
+                    fontsize=12, fontweight="bold" if wrong else "normal", color=INK)
+        ax.set_yticks(range(len(order))[::-1])
+        ax.set_yticklabels([o[1] for o in order], fontsize=11)
+        ax.set_xlim(0, 118)
+        ax.set_title(title, loc="left", fontsize=13, fontweight="bold")
+        ax.set_xlabel("% of new requests answered without calling the LLM", fontsize=10)
+        ax.xaxis.grid(True, color=GRID)
+        ax.set_axisbelow(True)
+        ax.tick_params(length=0)
+    fig.suptitle("Against other caches, on the same requests", x=0.015, y=0.985, ha="left", fontsize=16, fontweight="bold")
+    fig.text(0.015, 0.915, "Red is wrong answers. A semantic cache reuses an old answer, so it is wrong whenever the numbers differ.",
+             fontsize=11.5, color=INK2, ha="left")
+    fig.text(0.015, 0.012, "Always-correct main model, so every wrong answer is the cache's own. Learning stream: 150 requests, then 150 (162) new ones. "
+             "One run each; see EXP-020.", fontsize=9, color=INK2, ha="left")
+    fig.tight_layout(rect=(0, 0.04, 1, 0.9))
+    fig.savefig(out / "fig5_comparison.png", dpi=170)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--rb-dir", default="results/real_baselines")
@@ -217,4 +256,6 @@ if __name__ == "__main__":
     fig_corrections(o)
     if (Path(a.learning_dir) / "llama3_teacher-correct_agree3.json").exists():
         fig_learning(Path(a.learning_dir), o)
+    if (Path(a.learning_dir) / "baselines.json").exists():
+        fig_comparison(Path(a.learning_dir), o)
     print("wrote", sorted(p.name for p in o.glob("fig*.png")))

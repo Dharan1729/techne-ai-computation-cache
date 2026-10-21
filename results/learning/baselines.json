@@ -1,0 +1,244 @@
+{
+  "numbers_repeat": {
+    "no_cache": {
+      "learning_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 150,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 150,
+        "correct_overall": 150
+      }
+    },
+    "exact_cache": {
+      "learning_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 150,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 150,
+        "correct_overall": 150
+      }
+    },
+    "semantic_cache@0.75": {
+      "learning_stream": {
+        "answered_by_cache": 95,
+        "wrong_answers": 3,
+        "llm_calls": 55,
+        "correct_overall": 147
+      },
+      "new_stream": {
+        "answered_by_cache": 96,
+        "wrong_answers": 3,
+        "llm_calls": 54,
+        "correct_overall": 147
+      }
+    },
+    "semantic_cache@0.9": {
+      "learning_stream": {
+        "answered_by_cache": 55,
+        "wrong_answers": 0,
+        "llm_calls": 95,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 59,
+        "wrong_answers": 0,
+        "llm_calls": 91,
+        "correct_overall": 150
+      }
+    },
+    "semantic_cache@0.97": {
+      "learning_stream": {
+        "answered_by_cache": 2,
+        "wrong_answers": 0,
+        "llm_calls": 148,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 150,
+        "correct_overall": 150
+      }
+    },
+    "hand_written_registry": {
+      "learning_stream": {
+        "answered_by_cache": 111,
+        "wrong_answers": 0,
+        "llm_calls": 39,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 112,
+        "wrong_answers": 0,
+        "llm_calls": 38,
+        "correct_overall": 150
+      }
+    },
+    "aicache_learning@5_agreements": {
+      "learning_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 190
+      },
+      "new_stream": {
+        "answered_by_cache": 82,
+        "wrong_answers": 0,
+        "llm_calls": 68,
+        "requests": 150
+      },
+      "note": "learning stream llm_calls = 150 main-model + 40 small-model"
+    },
+    "aicache_learning@3_agreements": {
+      "learning_stream": {
+        "answered_by_cache": 33,
+        "wrong_answers": 0,
+        "llm_calls": 157
+      },
+      "new_stream": {
+        "answered_by_cache": 124,
+        "wrong_answers": 0,
+        "llm_calls": 26,
+        "requests": 150
+      },
+      "note": "learning stream llm_calls = 117 main-model + 40 small-model"
+    },
+    "aicache_learning@1_agreements": {
+      "learning_stream": {
+        "answered_by_cache": 82,
+        "wrong_answers": 0,
+        "llm_calls": 108
+      },
+      "new_stream": {
+        "answered_by_cache": 133,
+        "wrong_answers": 0,
+        "llm_calls": 17,
+        "requests": 150
+      },
+      "note": "learning stream llm_calls = 68 main-model + 40 small-model"
+    }
+  },
+  "numbers_never_repeat": {
+    "no_cache": {
+      "learning_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 150,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 162,
+        "correct_overall": 162
+      }
+    },
+    "exact_cache": {
+      "learning_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 150,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 162,
+        "correct_overall": 162
+      }
+    },
+    "semantic_cache@0.75": {
+      "learning_stream": {
+        "answered_by_cache": 95,
+        "wrong_answers": 3,
+        "llm_calls": 55,
+        "correct_overall": 147
+      },
+      "new_stream": {
+        "answered_by_cache": 8,
+        "wrong_answers": 8,
+        "llm_calls": 154,
+        "correct_overall": 154
+      }
+    },
+    "semantic_cache@0.9": {
+      "learning_stream": {
+        "answered_by_cache": 55,
+        "wrong_answers": 0,
+        "llm_calls": 95,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 162,
+        "correct_overall": 162
+      }
+    },
+    "semantic_cache@0.97": {
+      "learning_stream": {
+        "answered_by_cache": 2,
+        "wrong_answers": 0,
+        "llm_calls": 148,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 162,
+        "correct_overall": 162
+      }
+    },
+    "hand_written_registry": {
+      "learning_stream": {
+        "answered_by_cache": 111,
+        "wrong_answers": 0,
+        "llm_calls": 39,
+        "correct_overall": 150
+      },
+      "new_stream": {
+        "answered_by_cache": 124,
+        "wrong_answers": 0,
+        "llm_calls": 38,
+        "correct_overall": 162
+      }
+    },
+    "aicache_learning@5_agreements": {
+      "learning_stream": {
+        "answered_by_cache": 0,
+        "wrong_answers": 0,
+        "llm_calls": 190
+      },
+      "new_stream": {
+        "answered_by_cache": 86,
+        "wrong_answers": 0,
+        "llm_calls": 76,
+        "requests": 162
+      },
+      "note": "learning stream llm_calls = 150 main-model + 40 small-model"
+    },
+    "aicache_learning@3_agreements": {
+      "learning_stream": {
+        "answered_by_cache": 33,
+        "wrong_answers": 0,
+        "llm_calls": 157
+      },
+      "new_stream": {
+        "answered_by_cache": 126,
+        "wrong_answers": 0,
+        "llm_calls": 36,
+        "requests": 162
+      },
+      "note": "learning stream llm_calls = 117 main-model + 40 small-model"
+    }
+  }
+}

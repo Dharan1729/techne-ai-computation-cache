@@ -4,7 +4,7 @@ Start with the [user guides](guide/quickstart.md). The rest of this folder is th
 
 | | |
 |---|---|
-| [guide/](guide/quickstart.md) | Using aicache: quickstart, [how it works](guide/how-it-works.md), [learning](guide/learning.md), config reference, rollout, gateway, integrations |
+| [guide/](guide/quickstart.md) (see also [putting it in your product](guide/integrate.md)) | Using aicache: quickstart, [how it works](guide/how-it-works.md), [learning](guide/learning.md), config reference, rollout, gateway, integrations |
 | [experiment-log.md](experiment-log.md) | Every experiment, newest conclusions last. Entries EXP-001 to EXP-014 are single-seed; EXP-015 to EXP-019 re-test and extend them and take precedence |
 | [prior-art.md](prior-art.md), [differentiation.md](differentiation.md) | Existing systems and papers, and what this project adds |
 | [problem.md](problem.md), [hypotheses.md](hypotheses.md), [architecture.md](architecture.md), [evaluation.md](evaluation.md) | The original research question, hypotheses and method |

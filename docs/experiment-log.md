@@ -1286,3 +1286,39 @@ The +224 ms is what the gateway adds to a request it cannot answer: embedding th
 - One laptop, Ollama models, 150-request streams.
 - Not tested: more than two models, long streams, other operation families, hosted models.
 - An attempt to also test wordings never seen during learning was dropped: the experiment would only confirm the exact-match property above, and the sandbox this was run in only advanced background jobs while a command was executing, making further long runs impractical.
+
+
+---
+
+## EXP-020 — The learning cache against the other caches
+
+**Date**: 2026-10-21. **Question**: how does the learning design compare with the baselines used since EXP-004? Until now the learning design was only compared with itself (EXP-019). Script: `benchmarks/learning_vs_baselines.py`. Raw: `results/learning/baselines.json`.
+
+**Setup.** Every system sees the EXP-019 stream: 150 requests (seed 1), then new requests with new numbers (seed 2). The main LLM is the always-correct stand-in, so every wrong answer is the cache's own. Two versions of the new stream: the EXP-019 one, where about two thirds of requests repeat numbers that appeared earlier in the stream (each set of numbers is rendered in about three wordings), and one where **no request repeats earlier numbers** (162 requests, one wording per set of numbers).
+
+Baselines (this repo's implementations, the same as in EXP-004 to EXP-006): no cache; exact cache; semantic cache, which reuses the nearest earlier request's *answer* above a similarity threshold (`redis/langcache-embed-v1`, thresholds 0.75, 0.90, 0.97; this implementation matched RedisVL within noise in EXP-006); and the **hand-written registry** of the previous design, where a person wrote the nine operations in advance. The hand-written registry is a reference, not a rival: it needs the human effort learning is meant to remove. aicache rows are the real-model runs from EXP-019 and a no-repeat rerun.
+
+New requests answered without calling the LLM (wrong answers in brackets):
+
+| System | Numbers often repeat (150 new) | **No request repeats numbers (162 new)** |
+|---|---|---|
+| No cache / exact cache | 0 | 0 |
+| Semantic cache, threshold 0.75 | 96 (**3 wrong**) | 8 (**8 wrong**) |
+| Semantic cache, threshold 0.90 | 59 (0 wrong) | 0 |
+| Semantic cache, threshold 0.97 | 0 | 0 |
+| Hand-written registry (needs a person) | 112 (0 wrong) | 124 (0 wrong) |
+| **aicache learning, 5 agreements (default)** | 82 (0 wrong) | 86 (0 wrong) |
+| **aicache learning, 3 agreements** | 124 (0 wrong) | 126 (0 wrong) |
+| aicache learning, 1 agreement | 133 (0 wrong) | not run |
+
+**Findings.**
+- **Semantic caching depends on repeated numbers.** When numbers repeat it answers many requests and is occasionally wrong: 3 of 96 at threshold 0.75. When no request repeats numbers, the loose threshold answered 8 requests and *all 8 were wrong*; the stricter ones answered nothing.
+- **aicache does not depend on repeated numbers,** because what it matches is the wording and the operation. Its coverage was about the same in both versions of the stream: 82 and 86 at the default setting, 124 and 126 at 3 agreements, with no wrong answers.
+- **It reaches the hand-written registry's coverage on the no-repeat stream** (126 against 124 at 3 agreements) without a person writing the operations. On the repeating stream it is below it at the default setting (82 against 112) and above it at 3 agreements (124).
+- **Total calls.** Over both streams, 3 agreements used 193 LLM-class calls (main plus small model) against 312 with no cache on the no-repeat stream: 157 while learning and 36 after. The default used 266 (190 and 76). The learning cost is real and paid once.
+
+**Limitations.**
+- One workload, one run per row, deterministic. A semantic cache is built for a different case (repeated or similar requests); on a stream full of exact repeats it would do better than shown. This comparison is about requests that share an operation but not their numbers.
+- The semantic and exact baselines were not re-run through real GPTCache or RedisVL here. Their real-system behaviour on this workload family is in EXP-006 (seed 42, different stream), where GPTCache with its default embedding model had a 70.7% wrong-hit rate.
+- The always-correct main model favors every cache. With a fallible main model aicache learns less (EXP-019); a semantic cache would also store the model's mistakes.
+- Not compared: Agentic Plan Caching and structured-intent caching (no runnable code), and the "LLM picks the tool and parameters" baseline of EXP-015, which needs tools to be written by hand and so is not a like-for-like comparison with learning.
