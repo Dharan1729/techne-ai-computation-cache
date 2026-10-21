@@ -151,6 +151,39 @@ class ActionCache:
         return Outcome("llm", answer, None, self.action_name(r.task), r.similarity, r.reason,
                        r.request_id, learning, (time.perf_counter() - t0) * 1000)
 
+    # ---- the two-call interface, for any framework -----------------------------
+    def lookup(self, text: str) -> Result:
+        """Ask the cache. If ``result.source == "computation"`` the answer is
+        ``result.text`` and no LLM is needed. Otherwise call your LLM and pass its
+        answer to ``record``. These two calls are all a framework integration needs."""
+        r = self.router.route(text)
+        if r.source == "computation":
+            self.note_computed(text, r)
+        return r
+
+    def record(self, text: str, result: Result, answer: str) -> str | None:
+        """Give the cache the LLM's answer to a request ``lookup`` did not answer, so it
+        can compare a phrasing on probation or learn from it."""
+        return self.after_llm(text, result, answer)
+
+    def wrap(self, llm: Callable[[str], str]) -> Callable[[str], str]:
+        """``llm`` with the cache in front: a function from request text to reply text."""
+        return lambda text: self.handle(text, llm).text
+
+    async def ahandle(self, text: str, llm: Callable[[str], Any]) -> Outcome:
+        """Async ``handle``. Routing runs in a worker thread; ``llm`` may be sync or async."""
+        import asyncio
+        import inspect
+
+        r = await asyncio.to_thread(self.lookup, text)
+        if r.source == "computation":
+            reply = r.text if r.text is not None else str(r.value)
+            return Outcome("computation", reply, r.value, self.action_name(r.task), r.similarity, "", r.request_id)
+        out = llm(text)
+        answer = await out if inspect.isawaitable(out) else out
+        learning = await asyncio.to_thread(self.record, text, r, answer)
+        return Outcome("llm", answer, None, self.action_name(r.task), r.similarity, r.reason, r.request_id, learning)
+
     def action_name(self, task: str | None) -> str | None:
         """The action a router task belongs to (learned phrasings are tasks named ``action#i``)."""
         learned = self._task_of.get(task or "")

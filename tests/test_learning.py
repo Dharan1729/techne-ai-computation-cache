@@ -442,3 +442,46 @@ def test_learning_off_never_creates_a_database_file(tmp_path, monkeypatch):
     assert c.handle("double 4", llm).value == 8.0
     c.close()
     assert list(tmp_path.iterdir()) == []                  # no aicache.db, no -wal, no -shm
+
+
+# ---- the integration interface ------------------------------------------------
+
+def test_lookup_and_record_are_all_a_framework_needs():
+    c = make(min_agreements=1)
+    text = "What is 15% of 240?"
+    r = c.lookup(text)
+    assert r.source == "fallback"                                  # nothing known yet
+    answer = llm(text)
+    assert c.record(text, r, answer) == "learned:percent_of"        # the framework hands the answer back
+    for t in ("What is 20% of 50?",):
+        r = c.lookup(t)
+        c.record(t, r, llm(t))                                      # a phrasing on probation: compared, LLM still answers
+    assert status(c) == "active"
+    r = c.lookup("What is 12% of 500?")
+    assert r.source == "computation" and r.text == "60.0"
+
+
+def test_wrap_turns_any_text_function_into_one_with_the_cache_in_front():
+    c = make(min_agreements=1)
+    ask = c.wrap(llm)
+    assert ask("What is 15% of 240?") == "The answer is 36."          # the LLM answered, and the cache learned
+    ask("What is 20% of 50?")
+    calls = llm.calls
+    assert ask("What is 12% of 500?") == "60.0" and llm.calls == calls
+
+
+def test_async_handle_with_sync_and_async_models():
+    import asyncio
+
+    async def go():
+        c = make(min_agreements=1)
+
+        async def allm(t):
+            return llm(t)
+
+        a = await c.ahandle("What is 15% of 240?", allm)           # async model
+        b = await c.ahandle("What is 20% of 50?", llm)             # sync model
+        d = await c.ahandle("What is 12% of 500?", llm)
+        return a.source, b.source, d.source, d.text
+
+    assert asyncio.run(go()) == ("llm", "llm", "computation", "60.0")
