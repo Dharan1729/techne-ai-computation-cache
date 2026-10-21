@@ -1,0 +1,47 @@
+# A gateway that learns calculation-shaped requests from your main LLM's answers.
+#
+#   ollama pull llama3          # used here as both the main model and the small model
+#   aicache serve examples/learning.yaml
+#
+# Then point your app at http://127.0.0.1:8080/v1. Watch what it learns:
+#   aicache actions examples/learning.yaml
+version: 1
+
+embedder: {type: sentence-transformers}       # or `hashing` for a no-download trial (then lower min_similarity)
+min_similarity: 0.6                           # retrieval only proposes candidates; exact wording decides
+
+upstream:                                     # your main LLM: its answers are what learning checks against
+  base_url: http://localhost:11434/v1
+  model: llama3
+
+learning:
+  enabled: true
+  store: aicache.db                           # SQLite file with everything learned
+  normalizer:                                 # the small model that identifies the operation
+    base_url: http://localhost:11434/v1
+    model: llama3
+  min_agreements: 5                           # different number sets the LLM must agree on before an action answers
+  promotion: auto                             # `manual` waits for `aicache approve`
+  audit_rate: 0.02                            # re-check 2% of live answers against the main LLM
+  skip_patterns: ["(?i)\\bclient[_ ]?id\\b"]  # extra: never learn from requests that match
+
+reply:
+  llm_when: "\\b(explain|why|summari[sz]e|walk me through)"   # these get an LLM-written reply from the computed value
+
+server:
+  api_key_env: GATEWAY_KEY                    # needed to listen on anything but 127.0.0.1
+  admin_token_env: GATEWAY_ADMIN              # enables /v1/aicache/* (review and approve learned actions)
+
+# Optional: tools you wrote yourself are pre-approved and answer from the first request.
+tools:
+  - name: percent_of
+    examples: ["What is X percent of Y?", "Calculate X% of Y.", "How much is X percent of the amount Y?"]
+    slots:
+      - {name: pct,  after: "%|percent", min: 0, max: 100}
+      - {name: base, before: "of"}
+    compute: "base * pct / 100"
+    cues: ["%|percent"]
+    format: "{value:.2f}"
+    tests:
+      - {text: "What is 15% of 240?", expect: 36}
+      - {text: "What is 15% of that?", expect: refuse}

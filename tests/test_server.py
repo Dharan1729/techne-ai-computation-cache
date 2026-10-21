@@ -242,6 +242,6 @@ def test_shadow_mode_serves_the_llm_answer_and_records_agreement(monkeypatch):
 def test_health_and_metrics_are_open():
     client, _, _ = make()
     chat(client, "What is 15% of 240?")
-    assert client.get("/healthz").json() == {"status": "ok", "tools": 1, "upstream": True}
+    assert client.get("/healthz").json() == {"status": "ok", "tools": 1, "learned_actions": 0, "learning": False, "upstream": True}
     m = client.get("/metrics")
     assert m.status_code == 200 and 'aicache_requests_total{source="computation"} 1' in m.text

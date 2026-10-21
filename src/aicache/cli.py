@@ -9,6 +9,14 @@
     aicache serve CONFIG                      OpenAI-compatible gateway (needs the 'serve' extra)
     aicache stats LOGFILE                     summarise a decision log
 
+    aicache learn CONFIG FILE                 learn actions from {"text", "answer"} pairs (JSONL)
+    aicache actions CONFIG                    list learned actions and their phrasings
+    aicache action CONFIG NAME                show one action with its evidence
+    aicache approve CONFIG NAME               let an action (or one --phrasing) answer requests
+    aicache reject CONFIG NAME                stop an action (or one --phrasing) answering requests
+    aicache export CONFIG FILE                write learned actions to YAML for review
+    aicache import CONFIG FILE                load actions from such a file
+
 Exit codes: 0 success, 1 a check failed (tests, lint with --strict, wrong
 executions above --max-wrong), 2 bad usage or an invalid config.
 """
@@ -22,6 +30,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .actions import ActionStore
 from .config import ConfigError, build_router, lint_config, load_config, run_golden_tests
 from .embedders import make_embedder
 from .tooling import calibrate, evaluate, load_labeled, summarize_log
@@ -34,9 +43,12 @@ STARTER = """\
 version: 1
 min_similarity: 0.5
 embedder: {type: sentence-transformers}   # or `hashing` (no download; then lower min_similarity: run `aicache calibrate`)
-# upstream:                                # needed for `aicache serve`
+# upstream:                                # your main LLM, needed for `aicache serve`
 #   base_url: http://localhost:11434/v1
 #   model: llama3
+# learning:                                # learn more actions from your LLM's answers
+#   enabled: true
+#   normalizer: {base_url: http://localhost:11434/v1, model: llama3}
 tools:
   - name: percent_of
     description: A percentage of an amount.
@@ -57,11 +69,19 @@ tools:
 
 
 def _load(args: argparse.Namespace):
+    """The config and a router that includes the learned actions in its store."""
+    from .engine import ActionCache
+
     cfg = load_config(Path(args.config))
-    emb = None
-    if getattr(args, "embedder", None):
-        emb = make_embedder(args.embedder)
+    emb = make_embedder(args.embedder) if getattr(args, "embedder", None) else None
+    if cfg.learning.enabled:
+        return cfg, ActionCache.from_config(cfg, embedder=emb).router
     return cfg, build_router(cfg, embedder=emb)
+
+
+def _store(args: argparse.Namespace) -> ActionStore:
+    cfg = load_config(Path(args.config))
+    return ActionStore(cfg.learning.store)
 
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -177,6 +197,107 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_learn(args: argparse.Namespace) -> int:
+    from collections import Counter
+
+    from .engine import ActionCache
+
+    cfg = load_config(Path(args.config))
+    if not cfg.learning.enabled:
+        print("error: learning is not enabled in this config (learning.enabled)", file=sys.stderr)
+        return 2
+    emb = make_embedder(args.embedder) if args.embedder else None
+    cache = ActionCache.from_config(cfg, embedder=emb, synchronous=True)
+    outcomes: Counter[str] = Counter()
+    n = 0
+    for line in Path(args.file).read_text().splitlines():
+        if not line.strip():
+            continue
+        d = json.loads(line)
+        outcomes[cache.learner.consider(str(d["text"]), str(d["answer"])).split(":")[0]] += 1  # type: ignore[union-attr]
+        n += 1
+        if args.limit and n >= args.limit:
+            break
+    print(f"{n} pairs: " + ", ".join(f"{k} x{v}" for k, v in outcomes.most_common()))
+    for a in cache.store.list():
+        print(f"  {a.name:22s} {a.compute}   phrasings: {len(a.templates)} (all on probation)")
+    print("Learned phrasings start on probation: they answer requests only after agreeing with the LLM on live traffic.\n"
+          "Review with `aicache actions`, or approve with `aicache approve`.")
+    return 0
+
+
+def _print_action(a, detail: bool) -> None:
+    print(f"{a.name}  [{a.status}]  {a.compute}   params: {', '.join(a.params)}   answered: {a.used}")
+    for t in a.templates:
+        ev = f"agree {t.agree}, disagree {t.disagree}, answered {t.used}"
+        print(f"    {t.status:9s} {t.text}   ({ev})" + (f"   note: {t.note}" if detail and t.note else ""))
+
+
+def cmd_actions(args: argparse.Namespace) -> int:
+    actions = _store(args).list()
+    if args.status:
+        actions = [a for a in actions if a.status == args.status]
+    for a in actions:
+        _print_action(a, False)
+    print(f"{len(actions)} actions")
+    return 0
+
+
+def cmd_action(args: argparse.Namespace) -> int:
+    a = _store(args).get(args.name)
+    if a is None:
+        print(f"error: no action named {args.name!r}", file=sys.stderr)
+        return 2
+    _print_action(a, True)
+    print(f"reply: {a.response}")
+    return 0
+
+
+def _set_status(args: argparse.Namespace, status: str) -> int:
+    store = _store(args)
+    a = store.get(args.name)
+    if a is None:
+        print(f"error: no action named {args.name!r}", file=sys.stderr)
+        return 2
+    note = "approved by a person" if status == "active" else "rejected by a person"
+    hit = [t for t in a.templates if (args.phrasing is None or t.text == args.phrasing)
+           and not (status == "active" and t.status == "rejected")]
+    if not hit:
+        print("error: no matching phrasing", file=sys.stderr)
+        return 2
+    for t in hit:
+        store.set_template_status(a.name, t.text, status, note)
+    print(f"{a.name}: {len(hit)} phrasing(s) now {status}. A running gateway picks this up after a restart; "
+          "use its admin endpoint to change it live.")
+    return 0
+
+
+def cmd_approve(args: argparse.Namespace) -> int:
+    return _set_status(args, "active")
+
+
+def cmd_reject(args: argparse.Namespace) -> int:
+    return _set_status(args, "rejected")
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    import yaml
+
+    items = _store(args).export()
+    Path(args.file).write_text(yaml.safe_dump({"actions": items}, sort_keys=False, allow_unicode=True))
+    print(f"wrote {len(items)} actions to {args.file}")
+    return 0
+
+
+def cmd_import(args: argparse.Namespace) -> int:
+    import yaml
+
+    items = yaml.safe_load(Path(args.file).read_text()).get("actions", [])
+    added, skipped = _store(args).import_actions(items, overwrite=args.overwrite)
+    print(f"added {added}, skipped {skipped} (already present; use --overwrite to replace)")
+    return 0
+
+
 def cmd_stats(args: argparse.Namespace) -> int:
     s = summarize_log(args.logfile)
     print(json.dumps(s, indent=2))
@@ -221,6 +342,33 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-unauthenticated", action="store_true",
                    help="allow a non-local host without server.api_key_env (only if the network restricts access)")
     p.add_argument("--log-level", default="info")
+    p = with_config("learn", "learn actions from request and answer pairs", cmd_learn)
+    p.add_argument("file", help='JSONL: {"text": ..., "answer": ...}')
+    p.add_argument("--limit", type=int, default=0)
+    p = sub.add_parser("actions", help="list learned actions")
+    p.add_argument("config")
+    p.add_argument("--status", choices=["probation", "active", "rejected"])
+    p.set_defaults(fn=cmd_actions)
+    p = sub.add_parser("action", help="show one learned action")
+    p.add_argument("config")
+    p.add_argument("name")
+    p.set_defaults(fn=cmd_action)
+    for verb, fn, helptext in (("approve", cmd_approve, "let a learned action answer requests"),
+                               ("reject", cmd_reject, "stop a learned action answering requests")):
+        p = sub.add_parser(verb, help=helptext)
+        p.add_argument("config")
+        p.add_argument("name")
+        p.add_argument("--phrasing", help="only this phrasing (the exact template text)")
+        p.set_defaults(fn=fn)
+    p = sub.add_parser("export", help="write learned actions to a YAML file")
+    p.add_argument("config")
+    p.add_argument("file")
+    p.set_defaults(fn=cmd_export)
+    p = sub.add_parser("import", help="load learned actions from a YAML file")
+    p.add_argument("config")
+    p.add_argument("file")
+    p.add_argument("--overwrite", action="store_true")
+    p.set_defaults(fn=cmd_import)
     p = sub.add_parser("stats", help="summarise a decision log (telemetry.log_file)")
     p.add_argument("logfile")
     p.set_defaults(fn=cmd_stats)
