@@ -24,7 +24,9 @@ tools: [...]
 | `upstream` | none | Needed for `aicache serve` to forward requests the router cannot answer. |
 | `telemetry` | see below | Decision log and counters. |
 | `server` | see below | Gateway security and limits. |
-| `tools` | required | At least one tool. |
+| `learning` | off | Learn actions from the main LLM's answers. See below and [learning](learning.md). |
+| `reply` | see below | When the LLM writes the reply. |
+| `tools` | `[]` | Tools you write yourself. Give at least one tool, or turn learning on. |
 
 ## `embedder`
 
@@ -35,6 +37,38 @@ tools: [...]
 | `hashing` | No dependencies, no download, about 0.1 ms per request. Matches spelling, not meaning. See the note below on thresholds. |
 
 **Each embedder needs its own `min_similarity`.** On our 131-request finance set, `aicache calibrate` found both safe: `hashing` at a threshold of 0.1 computed 91 of 96 computable requests with no wrong answers and no false triggers, and the neural model at 0.45 computed 90 of 96 with none. Used at the neural model's threshold (0.45), `hashing` computed only 31 of 96. A looser embedder leans more on the slot check, so measure on your own requests. We did not test paraphrases looser than these templates, more tools, or more varied unrelated requests, where the neural model may matter more.
+
+## `learning`
+
+See [learning](learning.md) for what each setting does.
+
+```yaml
+learning:
+  enabled: true
+  store: aicache.db
+  normalizer: {base_url: http://localhost:11434/v1, model: llama3, api_key_env: NORMALIZER_KEY, timeout_s: 60, json_mode: true}
+  min_agreements: 5
+  reject_after: 2
+  promotion: auto            # or manual
+  audit_rate: 0.0
+  max_actions: 500
+  max_request_chars: 300
+  max_numbers: 5
+  skip_patterns: []
+  queue_size: 100
+  synchronous: false
+```
+
+With `learning.enabled`, `normalizer.base_url` and `normalizer.model` are required. `json_mode` asks the endpoint for JSON output; turn it off for an endpoint that rejects `response_format`.
+
+## `reply`
+
+```yaml
+reply:
+  llm_when: "\\b(explain|why|summari[sz]e|walk me through)"
+```
+
+A request matching this regex gets its reply written by the LLM from the computed value (the LLM is told not to recompute it). Every other request is answered from the action's reply template with no LLM call. Set `llm_when: null` to never use the LLM for replies.
 
 ## `upstream`
 

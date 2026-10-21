@@ -4,7 +4,21 @@
 
 Anything that lets you set a base URL works: the OpenAI Python and JavaScript SDKs, LangChain's `ChatOpenAI(base_url=...)`, LiteLLM, curl. See [the gateway](gateway.md).
 
-## Python
+## Python, with learning
+
+```python
+from aicache.config import load_config
+from aicache.engine import ActionCache
+
+cache = ActionCache.from_config(load_config("aicache.yaml"))
+out = cache.handle(user_text, llm=lambda text: call_my_model(text))
+out.source   # "computation", "computation+llm" or "llm"
+out.text     # the reply
+```
+
+`handle` answers from a stored action if it can and calls your `llm` otherwise, then learns from the answer in the background. `cache.flush()` waits for learning to finish. `cache.approve(name)` and `cache.reject(name)` review what was learned. See [learning](learning.md).
+
+## Python, tools you write yourself
 
 ```python
 from aicache.config import build_router, load_config

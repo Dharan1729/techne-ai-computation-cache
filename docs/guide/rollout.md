@@ -1,5 +1,20 @@
 # Rolling it out safely
 
+## Learned actions
+
+Learning is built to be safe without you watching it, but the safest way to adopt it is in stages.
+
+1. **Start with manual promotion.** `learning.promotion: manual`. Nothing learned answers a request until you approve it. Run for a few days.
+2. **Read what it learned.** `aicache actions aicache.yaml` lists each action, its formula, and for each wording how many different number sets the LLM agreed on. Read the formulas. A wrong one is usually obvious. Reject anything odd with `aicache reject`.
+3. **Check it on requests you labeled.** `aicache eval aicache.yaml --labeled requests.jsonl` counts wrong answers, treating every learned wording as live, so you see what would happen if you approved everything. It exits non-zero on any wrong answer, so it can gate a release.
+4. **Approve what you trust.** `aicache approve aicache.yaml percent_of`. Or switch to `promotion: auto` once the formulas it learns have looked right for a while.
+5. **Turn on audits.** `learning.audit_rate: 0.02` re-checks 2% of live answers against your main LLM in the background. A disagreement sends that wording back to probation. This is the guard against drift and against a formula that was right on probation and wrong somewhere else.
+6. **Watch the counters.** `aicache_learning_total` in `/metrics`: `learned`, `merged`, `promoted`, `demoted`, and why proposals were rejected. A rising `demoted` count means audits or probation are catching things. A flood of `rejected:expression_disagrees_with_answer` means the small model is struggling with your requests or your main model is often wrong. Both are worth knowing.
+
+Throw it all away at any time by deleting the store file, or one action with `aicache reject`.
+
+## Tools you write yourself
+
 Do these in order. Each step needs only the config and some real requests.
 
 ## 1. Golden tests in the config

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-computation-cache"
-version = "0.2.0"
-description = "Answer calculation-shaped LLM requests with your own code, and send everything else to the model. Includes an OpenAI-compatible gateway, evaluation tooling and research benchmarks."
+version = "0.3.0"
+description = "Learns the operation behind calculation-shaped LLM requests from your model's own answers, verifies it, and answers them itself. An OpenAI-compatible gateway, with research benchmarks."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}

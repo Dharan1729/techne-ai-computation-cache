@@ -1,0 +1,284 @@
+{
+  "normalizer": "llama3",
+  "main": "simulated",
+  "min_similarity": 0.6,
+  "learn_seed": 3,
+  "test_seed": 4,
+  "normalizer_calls": 43,
+  "min_agreements": 3,
+  "learn_stream": {
+    "n": 150,
+    "computed": 34,
+    "llm_calls": 116,
+    "wrong_executions": 0,
+    "overall_correct": 150,
+    "computed_by_task": {
+      "tax": 2,
+      "compound_interest": 6,
+      "multiply": 2,
+      "discounted_price": 6,
+      "revenue": 6,
+      "percentage": 6,
+      "subtract": 2,
+      "margin": 2,
+      "add": 2
+    },
+    "wrong_by_task": {},
+    "learning_outcomes": {
+      "learned:percent_of": 1,
+      "merged:percent_of": 3,
+      "learned:percent_off": 1,
+      "learned:subtract": 1,
+      "learned:multiply": 1,
+      "merged:multiply": 6,
+      "rejected:expression_disagrees_with_answer": 17,
+      "merged:percent_off": 2,
+      "learned:compound_interest": 1,
+      "merged:compound_interest": 2,
+      "merged:subtract": 2,
+      "learned:add": 1,
+      "learned:margin": 1,
+      "merged:add": 4
+    },
+    "probation_disagreements": [],
+    "median_ms_computed": 11.096958070993423,
+    "median_ms_llm": 13.307416345924139,
+    "seconds": 90
+  },
+  "held_out_stream": {
+    "n": 150,
+    "computed": 121,
+    "llm_calls": 29,
+    "wrong_executions": 0,
+    "overall_correct": 150,
+    "computed_by_task": {
+      "compound_interest": 18,
+      "subtract": 10,
+      "multiply": 18,
+      "add": 9,
+      "margin": 6,
+      "percentage": 18,
+      "discounted_price": 18,
+      "tax": 6,
+      "revenue": 18
+    },
+    "wrong_by_task": {},
+    "learning_outcomes": {},
+    "probation_disagreements": [],
+    "median_ms_computed": 10.35691611468792,
+    "median_ms_llm": 10.31875004991889
+  },
+  "actions": [
+    {
+      "name": "percent_of",
+      "status": "active",
+      "expression": "base * pct / 100",
+      "phrasings": [
+        {
+          "text": "What is {pct} percent of {base}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What is the tax owed on an income of ${base} at a tax rate of {pct} percent?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "How much is {pct} percent of {base}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Calculate {pct}% of {base}.",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "percent_off",
+      "status": "active",
+      "expression": "price - (price * discount / 100)",
+      "phrasings": [
+        {
+          "text": "A price of ${price} gets a {discount} percent discount applied to it \u2014 what's the result?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What is the discounted price if the original price is ${price} and the discount is {discount} percent?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "An item costs ${price}. What does it cost after a {discount} percent discount?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "subtract",
+      "status": "active",
+      "expression": "start - takeaway",
+      "phrasings": [
+        {
+          "text": "Starting with {start} what do you get if you take away {takeaway}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What is {start} minus {takeaway}?",
+          "status": "probation",
+          "agree": 2,
+          "disagree": 0
+        },
+        {
+          "text": "Starting from {start} subtract {takeaway}.",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "multiply",
+      "status": "active",
+      "expression": "price * quantity",
+      "phrasings": [
+        {
+          "text": "What is the revenue if the price is ${price} and the quantity sold is {quantity}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Calculate total revenue for a price of ${price} on {quantity} units sold.",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What is {price} times {quantity}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Calculate the product of {price} and {quantity}.",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Multiply {price} by {quantity}.",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What do you get if you multiply {price} and {quantity} together?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "If we price an item at ${price} and sell {quantity} units, what's the revenue?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "compound_interest",
+      "status": "active",
+      "expression": "principal * (1 + rate / 100) ** years",
+      "phrasings": [
+        {
+          "text": "If I invest ${principal} at {rate} percent annual interest for {years} years, what is the final amount?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What will ${principal} grow to at {rate} percent compounded annually over {years} years?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Calculate compound interest on ${principal} at a rate of {rate} percent over {years} years.",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "add",
+      "status": "active",
+      "expression": "x + y",
+      "phrasings": [
+        {
+          "text": "Can you add {x} and {y} together?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Calculate the sum of {x} and {y}.",
+          "status": "probation",
+          "agree": 2,
+          "disagree": 0
+        },
+        {
+          "text": "What do you get if you add {x} and {y}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "{x} + {y} = ?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What is {x} plus {y}?",
+          "status": "probation",
+          "agree": 0,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "margin",
+      "status": "active",
+      "expression": "(revenue - cost) / revenue",
+      "phrasings": [
+        {
+          "text": "Calculate margin given revenue of ${revenue} and cost of ${cost}.",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        }
+      ]
+    }
+  ],
+  "telemetry": {
+    "learned": 7,
+    "merged": 19,
+    "rejected:expression_disagrees_with_answer": 17,
+    "promoted": 23
+  }
+}

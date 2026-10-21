@@ -1,4 +1,8 @@
-# How a request is decided
+# Tools you write yourself
+
+This page covers tools you define in the config, which answer from the first request. For actions the system learns on its own, see [how it works](how-it-works.md) and [learning](learning.md).
+
+## How a request is decided
 
 For every request the router makes the same sequence of checks. It computes only if all of them pass. Otherwise the request goes to your fallback, usually the model.
 

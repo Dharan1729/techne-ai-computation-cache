@@ -1244,3 +1244,45 @@ The +224 ms is what the gateway adds to a request it cannot answer: embedding th
 **Embedder comparison** (same labeled set, `aicache eval` and `aicache calibrate`, no model behind it): the neural embedder at 0.45 computed 90 of 96 correctly at about 11 ms per request, with 0 wrong and 0 false triggers. The dependency-free hashing embedder at the neural model's 0.45 computed only 31 of 96, but at its own calibrated threshold (0.1) computed 87 to 91 of 96 (91 at 0.0, 87 at 0.2) with 0 wrong and 0 false triggers, at about 0.1 ms. On this set the slot check, not the embedding, does the rejecting, so the lighter embedder was enough once calibrated. Not tested: looser paraphrases, more tools, more varied unrelated requests.
 
 **Also checked**: the same config with the dependency-free hashing embedder was run in the Docker image (non-root, 357 MB, no torch): computed locally, forwarded to the host's Ollama, enforced the admin token, and reported stats. The core `pip install` is 77 MB against about 1.2 GB with the embedding model.
+
+
+---
+
+## EXP-019 — Learning operations from an LLM's answers, with real small models
+
+**Date**: 2026-10-21. **What is tested**: the design in [docs/guide/how-it-works.md](guide/how-it-works.md): a small LLM identifies the operation behind requests the cache cannot answer, code verifies the proposal, and it is stored and trusted only after probation. Harness: `benchmarks/learning_eval.py`. Raw runs: `results/learning/`.
+
+**Setup.** Level 1/2 workload (9 task types, 150 requests per stream, 2 to 5 wordings per task). *Learning stream*: seed 1, with learning on. *New stream*: seed 2, new numbers, learning off, store frozen. Embedder `redis/langcache-embed-v1`, retrieval threshold 0.6. The small model is a real Ollama model at temperature 0. The main model is either an always-correct stand-in (to isolate the learning mechanism) or a real llama3 8B. "Wrong" means the cache answered and the answer did not match the ground truth.
+
+| Small model | Main model | Agreements | Answered while learning | Answered on new requests | Wrong (both streams) | Main-model calls on new requests | Small-model calls while learning | Actions |
+|---|---|---|---|---|---|---|---|---|
+| llama3 8B | correct | 1 | 82 | 133 | 0 | 17 | 40 | 7 |
+| llama3 8B | correct | 3 | 33 | 124 | 0 | 26 | 40 | 7 |
+| llama3 8B | correct | 3 (seeds 3 and 4) | 34 | 121 | 0 | 29 | 43 | 7 |
+| llama3 8B | correct | 5 (default) | 0 | 82 | 0 | 68 | 40 | 7 |
+| llama3.2 1B | correct | 3 | 13 | 52 | 0 | 98 | 99 | 4 |
+| llama3 8B | llama3 8B | 3 | 6 | 22 | 0 | 128 | 87 | 6 |
+
+**Findings.**
+
+- **No wrong answer in any configuration**, across 1,800 requests in total (six configurations, two streams each, 150 requests per stream).
+- **Counts reproduce exactly.** Rerunning the 1 and 3 agreement configurations gave identical numbers (temperature 0, fixed seed).
+- **Call accounting** (3 agreements, 8B): the learning stream used 117 main-model calls plus 40 small-model calls, 157 model calls for 150 requests. The new stream used 26 main-model calls instead of 150. The cost of learning is paid once.
+- **The agreement threshold trades speed for caution.** At 5 agreements nothing was answered while learning, because each wording appears only about 4 times in 150 requests. Longer streams close the gap.
+- **A 1B model learns much less and stays safe.** 49 of its proposals failed because it did not name every number; they were rejected.
+- **Probation caught a real mistake.** In the 8B run a tax wording was merged into the discount action (its formula happened to match the answer on the one request it was learned from). It disagreed with the LLM on later requests and was rejected after two.
+- **Verification rejects a lot.** In the 8B run, 11 proposals failed to reproduce the main model's answer; the formula for tasks such as tax and revenue was not inferred.
+- **A fallible main model teaches less.** llama3 8B is right on about half of these requests when answering raw. As the main model it taught only add and subtract (the operations it gets right); 49 proposals were rejected and 10 wordings were demoted. The cache learns what its teacher already does well and cannot fix a model's weaknesses.
+- **Latency.** In the fallible-teacher run, requests answered by the cache had a median of 46 ms, against 1,326 ms for requests the main model answered. One machine, shared with the model.
+
+**The first design failed, and was replaced.** The first version inferred where numbers sit from the words around each placeholder, and merged those patterns across wordings. In its first real-model run it answered wrong: 3 requests while learning and 6 on new requests. Disagreements showed an *add* request ("What do you get if you add 508 and 780?") answered by the *multiply* action. The derived patterns were too generic ("is", "and", "of"). The design was changed so a learned wording answers a request only if the request is that wording with different numbers (exact alignment), and trust became per wording. The results above are from the new design. That first run was a 60-request learning stream and is not in the table.
+
+**An earlier step also changed.** Asking llama3 to copy the request while replacing numbers with placeholders failed on 25 of the first 40 requests (it rewrote "58 percent" as "{pct}%", or reworded the sentence), although its formulas were right. Code now removes the numbers and the model only names the operation and writes the formula.
+
+**Limitations.**
+- The workload has 2 to 5 wordings per task, and the new stream reuses them. It tests new numbers, not new language. We did not measure how often real traffic repeats a wording. A stored wording matches only that exact wording, so an unseen wording is answered by the main model until learned. This is by construction (and unit-tested), not measured.
+- One run per configuration; the 5-agreement run is from the first pass and has no per-request series, so the figure draws it as zero while learning, which its totals confirm.
+- The always-correct main model is the best case. The fallible-teacher run shows the other end.
+- One laptop, Ollama models, 150-request streams.
+- Not tested: more than two models, long streams, other operation families, hosted models.
+- An attempt to also test wordings never seen during learning was dropped: the experiment would only confirm the exact-match property above, and the sandbox this was run in only advanced background jobs while a command was executing, making further long runs impractical.

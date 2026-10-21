@@ -16,6 +16,16 @@ export OPENAI_API_KEY=... GATEWAY_KEY=... GATEWAY_ADMIN=...
 aicache serve aicache.yaml --host 0.0.0.0 --port 8080
 ```
 
+## Learning in the gateway
+
+With `learning.enabled`, the gateway forwards every request it cannot answer, returns the upstream's answer to the client unchanged, and then, in the background, gives the (request, answer) pair to the learner. That includes streamed answers, which are collected as they pass through. It does not learn from requests it passes straight through (tools, structured output, images, very long text).
+
+A phrasing on probation sits next to the upstream: the gateway computes its result, still returns the upstream's answer, and records whether they agree. Once a phrasing is trusted the gateway answers it itself and the response carries `x-aicache-source: computation` and `x-aicache-task: <action>`.
+
+For a request that asks for an explanation (`reply.llm_when`), the gateway forwards the request with the computed value added and an instruction not to recompute it. The response reports `x-aicache-source: computation+llm`.
+
+Audits (`learning.audit_rate`) re-ask the upstream about a share of live answers and compare. They need `upstream.model`, because the gateway makes that call itself.
+
 ## What is intercepted
 
 Plain chat requests: the last message must be from the user and contain text. The router sees only that last user message.
@@ -60,7 +70,10 @@ Every response carries headers:
 | `GET /metrics` | none | Prometheus text |
 | `GET /v1/aicache/stats` | admin | counters and computed share |
 | `GET /v1/aicache/decisions?limit=50` | admin | recent decisions, newest first |
-| `GET /v1/aicache/tools` | admin | tools, modes, slot names |
+| `GET /v1/aicache/tools` | admin | tools you wrote, modes, slot names |
+| `GET /v1/aicache/actions` | admin | learned actions with each phrasing's status and evidence |
+| `POST /v1/aicache/actions/{name}/approve` | admin | let an action answer requests. Optional body `{"phrasing": "..."}` for one wording |
+| `POST /v1/aicache/actions/{name}/reject` | admin | stop an action answering requests |
 | `POST /v1/aicache/route` | admin | `{"text": "..."}` decision without calling the upstream |
 | `POST /v1/aicache/tools/{name}/mode` | admin | `{"mode": "active"\|"shadow"\|"off"}` |
 
@@ -71,6 +84,7 @@ aicache_requests_total{source="computation"|"fallback"}
 aicache_fallback_reason_total{reason="missing:account_size"|"below_similarity"|...}
 aicache_computed_total{task="position_size"}
 aicache_shadow_total{task="...",result="agree"|"disagree"}
+aicache_learning_total{outcome="learned"|"merged"|"promoted"|"demoted"|"rejected:<why>"|"skipped:<why>"}
 aicache_route_latency_ms  (histogram: routing decision time, not upstream time)
 ```
 

@@ -1,0 +1,668 @@
+{
+  "normalizer": "llama3",
+  "main": "ollama:llama3",
+  "min_similarity": 0.6,
+  "learn_seed": 1,
+  "test_seed": 2,
+  "normalizer_calls": 87,
+  "min_agreements": 3,
+  "learn_stream": {
+    "n": 150,
+    "computed": 6,
+    "llm_calls": 144,
+    "wrong_executions": 0,
+    "overall_correct": 77,
+    "computed_series": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0
+    ],
+    "computed_by_task": {
+      "subtract": 5,
+      "add": 1
+    },
+    "requests_by_task": {
+      "subtract": 18,
+      "multiply": 18,
+      "add": 18,
+      "compound_interest": 18,
+      "discounted_price": 18,
+      "percentage": 18,
+      "tax": 12,
+      "revenue": 18,
+      "margin": 12
+    },
+    "wrong_by_task": {},
+    "learning_outcomes": {
+      "learned:subtract": 1,
+      "rejected:expression_disagrees_with_answer": 49,
+      "learned:add": 1,
+      "merged:subtract": 3,
+      "learned:multiply": 1,
+      "rejected:bad_names": 6,
+      "merged:add": 4,
+      "learned:percent_of": 1,
+      "merged:percent_of": 4,
+      "merged:multiply": 5,
+      "rejected:expression_unknown_name": 3,
+      "learned:compound_interest": 1,
+      "skipped:rejected_phrasing": 6,
+      "learned:discount": 1,
+      "merged:discount": 1
+    },
+    "probation_disagreements": [
+      {
+        "action": "multiply",
+        "template": "Multiply {num1} by {num2}.",
+        "args": {
+          "num1": 762.0,
+          "num2": 817.0
+        },
+        "request": "Multiply 762 by 817."
+      },
+      {
+        "action": "percent_of",
+        "template": "What is the tax owed on an income of ${pct} at a tax rate of {base} percent?",
+        "args": {
+          "pct": 472286.0,
+          "base": 37.0
+        },
+        "request": "What is the tax owed on an income of $472286 at a tax rate of 37 percent?"
+      },
+      {
+        "action": "multiply",
+        "template": "Multiply {num1} by {num2}.",
+        "args": {
+          "num1": 191.0,
+          "num2": 645.0
+        },
+        "request": "Multiply 191 by 645."
+      },
+      {
+        "action": "percent_of",
+        "template": "Calculate {pct}% of {base}.",
+        "args": {
+          "pct": 48.0,
+          "base": 8033.0
+        },
+        "request": "Calculate 48% of 8033."
+      },
+      {
+        "action": "percent_of",
+        "template": "What is {pct} percent of {base}?",
+        "args": {
+          "pct": 22.0,
+          "base": 8238.0
+        },
+        "request": "What is 22 percent of 8238?"
+      },
+      {
+        "action": "percent_of",
+        "template": "How much is {pct} percent of {base}?",
+        "args": {
+          "pct": 22.0,
+          "base": 8238.0
+        },
+        "request": "How much is 22 percent of 8238?"
+      },
+      {
+        "action": "multiply",
+        "template": "If we price an item at ${num1} and sell {num2} units, what's the revenue?",
+        "args": {
+          "num1": 276.0,
+          "num2": 1794.0
+        },
+        "request": "If we price an item at $276 and sell 1794 units, what's the revenue?"
+      },
+      {
+        "action": "percent_of",
+        "template": "How much is {pct} percent of {base}?",
+        "args": {
+          "pct": 48.0,
+          "base": 8033.0
+        },
+        "request": "How much is 48 percent of 8033?"
+      },
+      {
+        "action": "compound_interest",
+        "template": "If I invest ${principal} at {rate} percent annual interest for {years} years, what is the final amount?",
+        "args": {
+          "principal": 63660.0,
+          "rate": 12.0,
+          "years": 14.0
+        },
+        "request": "If I invest $63660 at 12 percent annual interest for 14 years, what is the final amount?"
+      },
+      {
+        "action": "percent_of",
+        "template": "What is {pct} percent of {base}?",
+        "args": {
+          "pct": 48.0,
+          "base": 8033.0
+        },
+        "request": "What is 48 percent of 8033?"
+      }
+    ],
+    "median_ms_computed": 48.15812548622489,
+    "median_ms_llm": 3723.308646120131,
+    "seconds": 545
+  },
+  "held_out_stream": {
+    "n": 150,
+    "computed": 22,
+    "llm_calls": 128,
+    "wrong_executions": 0,
+    "overall_correct": 71,
+    "computed_series": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "computed_by_task": {
+      "subtract": 13,
+      "add": 9
+    },
+    "requests_by_task": {
+      "multiply": 18,
+      "tax": 12,
+      "subtract": 18,
+      "compound_interest": 18,
+      "percentage": 18,
+      "discounted_price": 18,
+      "revenue": 18,
+      "add": 18,
+      "margin": 12
+    },
+    "wrong_by_task": {},
+    "learning_outcomes": {},
+    "probation_disagreements": [],
+    "median_ms_computed": 46.09979153610766,
+    "median_ms_llm": 1325.9577087592334
+  },
+  "actions": [
+    {
+      "name": "subtract",
+      "status": "active",
+      "expression": "start - takeaway",
+      "phrasings": [
+        {
+          "text": "Starting with {start} what do you get if you take away {takeaway}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What is {start} minus {takeaway}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Calculate the difference between {start} and {takeaway}.",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Starting from {start} subtract {takeaway}.",
+          "status": "probation",
+          "agree": 0,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "add",
+      "status": "active",
+      "expression": "num1 + num2",
+      "phrasings": [
+        {
+          "text": "What is {num1} plus {num2}?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "What do you get if you add {num1} and {num2}?",
+          "status": "probation",
+          "agree": 2,
+          "disagree": 0
+        },
+        {
+          "text": "{num1} + {num2} = ?",
+          "status": "active",
+          "agree": 3,
+          "disagree": 0
+        },
+        {
+          "text": "Calculate the sum of {num1} and {num2}.",
+          "status": "probation",
+          "agree": 2,
+          "disagree": 0
+        },
+        {
+          "text": "Can you add {num1} and {num2} together?",
+          "status": "probation",
+          "agree": 2,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "multiply",
+      "status": "probation",
+      "expression": "num1 * num2",
+      "phrasings": [
+        {
+          "text": "Multiply {num1} by {num2}.",
+          "status": "rejected",
+          "agree": 0,
+          "disagree": 2
+        },
+        {
+          "text": "What do you get if you multiply {num1} and {num2} together?",
+          "status": "rejected",
+          "agree": 0,
+          "disagree": 2
+        },
+        {
+          "text": "Calculate total revenue for a price of ${num1} on {num2} units sold.",
+          "status": "rejected",
+          "agree": 1,
+          "disagree": 2
+        },
+        {
+          "text": "If we price an item at ${num1} and sell {num2} units, what's the revenue?",
+          "status": "rejected",
+          "agree": 1,
+          "disagree": 2
+        },
+        {
+          "text": "What is the revenue if the price is ${num1} and the quantity sold is {num2}?",
+          "status": "rejected",
+          "agree": 1,
+          "disagree": 2
+        },
+        {
+          "text": "What is {num1} times {num2}?",
+          "status": "probation",
+          "agree": 0,
+          "disagree": 0
+        }
+      ]
+    },
+    {
+      "name": "percent_of",
+      "status": "probation",
+      "expression": "base * pct / 100",
+      "phrasings": [
+        {
+          "text": "How much is {pct} percent of {base}?",
+          "status": "rejected",
+          "agree": 0,
+          "disagree": 2
+        },
+        {
+          "text": "What is the tax owed on an income of ${pct} at a tax rate of {base} percent?",
+          "status": "rejected",
+          "agree": 2,
+          "disagree": 2
+        },
+        {
+          "text": "Calculate {pct}% of {base}.",
+          "status": "rejected",
+          "agree": 3,
+          "disagree": 2
+        },
+        {
+          "text": "What is {pct} percent of {base}?",
+          "status": "rejected",
+          "agree": 1,
+          "disagree": 2
+        },
+        {
+          "text": "Calculate tax on ${pct} of income at a {base} percent rate.",
+          "status": "probation",
+          "agree": 3,
+          "disagree": 1
+        }
+      ]
+    },
+    {
+      "name": "compound_interest",
+      "status": "rejected",
+      "expression": "principal * (1 + rate / 100) ** years",
+      "phrasings": [
+        {
+          "text": "If I invest ${principal} at {rate} percent annual interest for {years} years, what is the final amount?",
+          "status": "rejected",
+          "agree": 0,
+          "disagree": 2
+        }
+      ]
+    },
+    {
+      "name": "discount",
+      "status": "probation",
+      "expression": "price * (1 - pct / 100)",
+      "phrasings": [
+        {
+          "text": "An item costs ${price}. What does it cost after a {pct} percent discount?",
+          "status": "probation",
+          "agree": 2,
+          "disagree": 0
+        },
+        {
+          "text": "A price of ${price} gets a {pct} percent discount applied to it \u2014 what's the result?",
+          "status": "probation",
+          "agree": 1,
+          "disagree": 0
+        }
+      ]
+    }
+  ],
+  "telemetry": {
+    "learned": 6,
+    "rejected:expression_disagrees_with_answer": 49,
+    "merged": 17,
+    "rejected:bad_names": 6,
+    "promoted": 5,
+    "demoted": 10,
+    "rejected:expression_unknown_name": 3,
+    "skipped:rejected_phrasing": 6
+  }
+}

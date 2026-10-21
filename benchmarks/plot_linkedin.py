@@ -152,15 +152,69 @@ def fig_corrections(out: Path) -> None:
     plt.close(fig)
 
 
+def fig_learning(res_dir: Path, out: Path) -> None:
+    """Learning curve: share of the learning stream answered locally, by request number,
+    for three agreement thresholds. Read from results/learning/*.json."""
+    runs = [("llama3_teacher-correct_agree1", "1 agreement", ORANGE),
+            ("llama3_teacher-correct_agree3", "3 agreements", BLUE),
+            ("llama3_teacher-correct_agree5", "5 agreements", GRAY)]
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 6.2), gridspec_kw={"width_ratios": [1.5, 1]})
+    for name, label, col in runs:
+        d = json.loads((res_dir / f"{name}.json").read_text())
+        series = d["learn_stream"].get("computed_series") or [0] * d["learn_stream"]["n"]  # first-pass run: 0 answered while learning
+        cum, tot = [], 0
+        for i, v in enumerate(series, 1):
+            tot += v
+            cum.append(100 * tot / i)
+        a1.plot(range(1, len(cum) + 1), cum, color=col, lw=2.4)
+        a1.text(len(cum) + 1, cum[-1], label, color=INK, fontsize=11.5, va="center")
+    a1.set_xlim(0, 150 * 1.28)
+    a1.set_ylim(0, 100)
+    a1.set_xlabel("Requests seen so far", fontsize=11)
+    a1.set_ylabel("Answered by aicache so far (%)", fontsize=11)
+    a1.set_title("While learning (150 requests)", loc="left", fontsize=14, fontweight="bold")
+    held = []
+    for name, label, col in runs:
+        d = json.loads((res_dir / f"{name}.json").read_text())
+        t = d["held_out_stream"]
+        held.append((label, 100 * t["computed"] / t["n"], t["wrong_executions"], col))
+    for i, (label, pct, wrong, col) in enumerate(held):
+        a2.bar(i, pct, color=col, width=0.6)
+        a2.text(i, pct + 2, f"{pct:.0f}%", ha="center", fontsize=14, fontweight="bold")
+        a2.text(i, 6, f"{wrong} wrong", ha="center", fontsize=12, fontweight="bold",
+                color=INK if col == GRAY else "white")
+    a2.set_xticks(range(3))
+    a2.set_xticklabels([h[0] for h in held], fontsize=11)
+    a2.set_ylim(0, 100)
+    a2.set_title("Then, on 150 new requests", loc="left", fontsize=14, fontweight="bold")
+    a2.set_ylabel("Answered by aicache (%)", fontsize=11)
+    for a in (a1, a2):
+        a.yaxis.grid(True, color=GRID)
+        a.set_axisbelow(True)
+        a.tick_params(length=0)
+    fig.suptitle("It learns the operation from your model's answers, then answers by itself", x=0.015, y=0.985,
+                 ha="left", fontsize=16, fontweight="bold")
+    fig.text(0.015, 0.915, "Number of different-number agreements required before a learned wording may answer. Safer is slower.",
+             fontsize=11.5, color=INK2, ha="left")
+    fig.text(0.015, 0.012, "Real llama3 8B identifies the operation; the main model is always right here. New requests use new numbers with wordings seen "
+             "while learning.\nOne run each; see docs/experiment-log.md EXP-019.", fontsize=9, color=INK2, ha="left")
+    fig.tight_layout(rect=(0, 0.06, 1, 0.9))
+    fig.savefig(out / "fig4_learning.png", dpi=170)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--rb-dir", default="results/real_baselines")
     ap.add_argument("--rep-dir", required=True)
     ap.add_argument("--out", default="results/figures")
+    ap.add_argument("--learning-dir", default="results/learning")
     a = ap.parse_args()
     o = Path(a.out)
     o.mkdir(parents=True, exist_ok=True)
     fig_baselines(Path(a.rb_dir), o)
     fig_repeats(Path(a.rep_dir), o)
     fig_corrections(o)
+    if (Path(a.learning_dir) / "llama3_teacher-correct_agree3.json").exists():
+        fig_learning(Path(a.learning_dir), o)
     print("wrote", sorted(p.name for p in o.glob("fig*.png")))

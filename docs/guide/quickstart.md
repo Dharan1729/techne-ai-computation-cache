@@ -1,6 +1,10 @@
 # Quickstart
 
-You have an LLM app. Some requests are really calculations: a percentage, a price after a discount, a position size. A model can get these wrong, and it takes a second or more to answer them. aicache answers them with your own code when it can bind every number safely, and sends everything else to the model.
+You have an LLM app. Some of its requests are really calculations: a percentage, a price after a discount, a loan payment. A model answers them slowly and sometimes wrongly, and it answers the same *kind* of request again and again with different numbers.
+
+aicache sits in front of your model. It learns the operation behind such requests from the answers your model already gives, and once it has checked that it is right, it computes them itself. Everything else goes to your model, unchanged.
+
+Read [how it works](how-it-works.md) first if you want the idea. This page gets it running.
 
 ## 1. Install
 
@@ -8,86 +12,123 @@ You have an LLM app. Some requests are really calculations: a percentage, a pric
 pip install "ai-computation-cache[embeddings,serve]"
 ```
 
-The core package is small. `embeddings` adds the local embedding model, `serve` adds the gateway, `langchain` adds the LangChain helper. No embedding download? Use `embedder: {type: hashing}` for a first trial, and run `aicache calibrate` to set its `min_similarity`: it needs a lower value than the neural model.
+The core package is small. `embeddings` adds the local embedding model, `serve` adds the gateway, `langchain` adds the LangChain helper.
 
-## 2. Describe one tool
+## 2. Pick two models
+
+- **Your main model.** The one your app already calls. Its answers are what learning is checked against, so use your best one.
+- **A small model** that identifies the operation behind a request. Any OpenAI-compatible endpoint. A local 8B model through Ollama works well, and a smaller one learns less but stays safe.
 
 ```bash
-aicache init aicache.yaml
+ollama pull llama3        # used as both below, to try it
 ```
 
-This writes a starter config with one tool, `percent_of`:
+## 3. Write a config
 
 ```yaml
-tools:
-  - name: percent_of
-    examples:                       # how users phrase this request
-      - "What is X percent of Y?"
-      - "Calculate X% of Y."
-      - "How much is X percent of the amount Y?"
-    slots:                          # where each number sits in the sentence
-      - {name: pct,  after: "%|percent", min: 0, max: 100}
-      - {name: base, before: "of"}
-    compute: "base * pct / 100"     # a safe arithmetic expression, not code
-    format: "{value:.2f}"
-    tests:                          # requests that must compute, and must not
-      - {text: "What is 15% of 240?", expect: 36}
-      - {text: "What is 15% of that?", expect: refuse}
-```
+# aicache.yaml
+embedder: {type: sentence-transformers}
+min_similarity: 0.6
 
-## 3. Check it
+upstream:                                  # your main model
+  base_url: http://localhost:11434/v1
+  model: llama3
 
-```bash
-aicache validate aicache.yaml       # schema and lint
-aicache test aicache.yaml           # runs the tests inside the config
-aicache run aicache.yaml "Of 240, what is 15 percent?"
-```
-
-## 4. Measure it on your own requests
-
-Make a file of real requests with the answer you expect, or `refuse` for requests that must go to the model:
-
-```json
-{"text": "What is 15% of 240?", "expect": 36}
-{"text": "What does percent mean?", "expect": "refuse"}
+learning:
+  enabled: true
+  store: aicache.db                        # where learned actions are kept
+  normalizer:                              # the small model
+    base_url: http://localhost:11434/v1
+    model: llama3
 ```
 
 ```bash
-aicache eval aicache.yaml --labeled requests.jsonl
-aicache calibrate aicache.yaml --labeled requests.jsonl
+aicache validate aicache.yaml
 ```
 
-`eval` reports wrong executions, the number that matters. It exits non-zero if there are any, so you can run it in CI. See [rollout](rollout.md) before sending real traffic.
-
-## 5. Put it in front of your model
-
-As a gateway. Existing apps change only their base URL:
-
-```yaml
-upstream: {base_url: http://localhost:11434/v1, model: llama3}   # any OpenAI-compatible server
-```
+## 4. Run the gateway and point your app at it
 
 ```bash
 aicache serve aicache.yaml --port 8080
 ```
 
-`aicache serve` listens on `127.0.0.1` by default, so only your own machine can reach it. To listen on another address you must set `server.api_key_env` (see [the gateway](gateway.md)); otherwise it refuses to start.
-
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8080/v1", api_key="anything")
+client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="anything")
 client.chat.completions.create(model="m", messages=[{"role": "user", "content": "What is 15% of 240?"}])
 ```
 
-Or in Python, with any model call as the fallback:
+`aicache serve` listens on `127.0.0.1`, so only your machine can reach it. To listen on another address you must set `server.api_key_env` (see [the gateway](gateway.md)); otherwise it refuses to start.
 
-```python
-from aicache import ComputationRouter
-from aicache.config import build_router, load_config
+## 5. Watch it learn
 
-router = build_router(load_config("aicache.yaml"))
-result = router.run("What is 15% of 240?", fallback=ask_my_llm)
-result.source   # "computation" or "fallback"
+Send a few requests that share one wording and differ in the numbers:
+
+```
+What is 15% of 240?     -> goes to your model. aicache learns an action from the answer.
+What is 20% of 50?      -> goes to your model. The new action is on probation: it computes
+                           silently, and its answer is compared with your model's.
+What is 10% of 90?      -> same
+...
+What is 12% of 500?     -> answered by aicache. No model call.
 ```
 
-Or in a LangChain chain: see [integrations](integrations.md).
+```bash
+aicache actions aicache.yaml
+#   percent_of  [active]  base * pct / 100   params: pct, base
+#       active    What is {pct}% of {base}?   (agree 5, disagree 0, answered 3)
+```
+
+Every answer the gateway gives carries `x-aicache-source: computation` or `fallback`, so you can see which was which.
+
+## 6. Decide how much to trust it
+
+By default a phrasing goes live after the model agreed with it on 5 different sets of numbers and never disagreed. To check each one yourself first:
+
+```yaml
+learning:
+  promotion: manual
+```
+
+```bash
+aicache actions aicache.yaml                 # see what is waiting, with the evidence
+aicache approve aicache.yaml percent_of
+```
+
+See [learning](learning.md) for audits, privacy settings and the review workflow.
+
+## Tools you write yourself
+
+If you already know the operations, define them directly. They answer from the first request and need no learning:
+
+```yaml
+tools:
+  - name: percent_of
+    examples: ["What is X percent of Y?", "Calculate X% of Y.", "How much is X percent of the amount Y?"]
+    slots:
+      - {name: pct,  after: "%|percent", min: 0, max: 100}
+      - {name: base, before: "of"}
+    compute: "base * pct / 100"
+    tests:
+      - {text: "What is 15% of 240?", expect: 36}
+      - {text: "What is 15% of that?", expect: refuse}
+```
+
+```bash
+aicache test aicache.yaml
+aicache run aicache.yaml "What is 15% of 240?"
+```
+
+See [tools you write yourself](how-it-decides.md) and the [config reference](config-reference.md). Both kinds work together.
+
+## From Python
+
+```python
+from aicache.config import load_config
+from aicache.engine import ActionCache
+
+cache = ActionCache.from_config(load_config("aicache.yaml"))
+out = cache.handle("What is 15% of 240?", llm=lambda text: call_my_model(text))
+out.source   # "computation" or "llm"
+out.text     # the reply
+```

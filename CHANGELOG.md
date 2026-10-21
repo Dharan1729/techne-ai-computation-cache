@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+The product now follows the original design: it learns the operation behind a request instead of needing every tool written by hand.
+
+- **Learning (`aicache.engine.ActionCache`).** When the main LLM answers a request the cache could not, a small LLM identifies the operation (names the roles and writes a formula) while code removes the values. Proposals are verified deterministically, embedded, and stored in SQLite.
+- **Probation, per wording.** A new wording computes silently next to the LLM and answers requests only after agreeing with it on several different sets of numbers and never disagreeing. A trusted action's new wording earns trust by itself. Promotion can be manual. Audits re-check live answers.
+- **Exact wording decides.** A learned wording answers a request only if the request is that wording with different numbers. Embeddings retrieve candidates and never decide. (An earlier, looser design bound requests for the wrong operation in a real-model test and was replaced before release.)
+- **Equivalent operations merge by computation:** the same function under another name, or with roles in another order, becomes another wording of the same action.
+- Gateway learns from proxied answers, including streams; new admin endpoints list, approve and reject learned actions; LLM-written replies for explanation requests; audits.
+- CLI: `learn`, `actions`, `action`, `approve`, `reject`, `export`, `import`.
+- Privacy: requests that look like they contain emails, long numbers, SSNs or secrets are never learned from.
+- Config: `learning` and `reply` sections; tools are optional when learning is on; lint rules for risky learning settings.
+- Experiment EXP-019: the learning loop with real small models.
+
 ## 0.2.0
 
 First release of the product layer on top of the research code.

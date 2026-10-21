@@ -20,3 +20,6 @@ out/
 
 # Isolated environments for the optional GPTCache / RedisVL baselines
 .venvs-external/
+
+# Local learned-action stores
+aicache.db*
